@@ -1,0 +1,2 @@
+# No external dependencies required.
+# Uses Python 3.8+ standard library only (http.server, urllib, ssl, json).

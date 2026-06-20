@@ -1,0 +1,2486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Asset EOL Portal – Tenable</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+/* ── Reset & base ─────────────────────────────────────── */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  /* Tenable brand palette */
+  --nav-bg:#00203F;
+  --nav-border:rgba(255,255,255,.07);
+  --nav-text:rgba(255,255,255,.55);
+  --nav-text-hover:rgba(255,255,255,.85);
+  --nav-text-active:#fff;
+  --nav-active:rgba(255,255,255,.1);
+  --nav-indicator:#00C3A0;
+
+  /* Accents */
+  --accent:#00C3A0;      /* Tenable teal */
+  --accent-dark:#009980;
+  --accent-glow:rgba(0,195,160,.15);
+  --blue:#0073CF;
+  --blue-light:#e8f3fd;
+
+  /* Semantic colours */
+  --red:#D93025;
+  --red-light:#fde8e8;
+  --orange:#E8650A;
+  --orange-light:#fef3e2;
+  --green:#1E8A44;
+  --green-light:#e6f9ee;
+  --yellow:#F59E0B;
+
+  /* Neutrals */
+  --gray-50:#F8FAFC;
+  --gray-100:#F1F5F9;
+  --gray-200:#E2E8F0;
+  --gray-300:#CBD5E1;
+  --gray-400:#94A3B8;
+  --gray-500:#64748B;
+  --gray-600:#475569;
+  --gray-700:#334155;
+  --gray-800:#1E293B;
+  --gray-900:#0F172A;
+
+  /* Surface */
+  --card-bg:#FFFFFF;
+  --page-bg:#F0F4F8;
+  --border:#E2E8F0;
+  --border-focus:#00C3A0;
+
+  /* Shadows */
+  --shadow-sm:0 1px 3px rgba(0,0,0,.06),0 1px 2px rgba(0,0,0,.04);
+  --shadow:0 2px 8px rgba(0,0,0,.07),0 1px 3px rgba(0,0,0,.05);
+  --shadow-md:0 4px 16px rgba(0,0,0,.1),0 2px 6px rgba(0,0,0,.06);
+  --shadow-lg:0 12px 40px rgba(0,0,0,.15),0 4px 12px rgba(0,0,0,.08);
+
+  --font:'Inter',system-ui,-apple-system,sans-serif;
+  --nav-w:228px;
+  --header-h:58px;
+  --radius:10px;
+  --radius-lg:14px;
+}
+
+html,body{
+  height:100%;
+  font-family:var(--font);
+  font-size:14px;
+  color:var(--gray-800);
+  background:var(--page-bg);
+  -webkit-font-smoothing:antialiased;
+}
+
+/* ── Layout ──────────────────────────────────────────── */
+#app{display:flex;height:100vh;overflow:hidden}
+nav{width:var(--nav-w);background:var(--nav-bg);display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto}
+main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+header{
+  height:var(--header-h);background:var(--card-bg);
+  border-bottom:1px solid var(--border);
+  display:flex;align-items:center;padding:0 24px;gap:14px;flex-shrink:0;
+  box-shadow:var(--shadow-sm);
+}
+.content{flex:1;overflow-y:auto;padding:28px}
+
+/* ── Sidebar ─────────────────────────────────────────── */
+.nav-logo{
+  padding:20px 18px 16px;
+  border-bottom:1px solid var(--nav-border);
+  display:flex;flex-direction:column;gap:6px;
+}
+.nav-logo-row{display:flex;align-items:center;gap:10px}
+.nav-logo-mark{flex-shrink:0}
+.nav-logo-text{font-size:15px;font-weight:700;color:#fff;letter-spacing:-.3px}
+.nav-logo-sub{
+  font-size:10px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;
+  color:var(--nav-indicator);padding-left:2px;
+}
+
+.nav-section{
+  padding:20px 18px 6px;
+  font-size:9.5px;font-weight:700;letter-spacing:1px;
+  text-transform:uppercase;color:rgba(255,255,255,.28);
+}
+.nav-item{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 14px;margin:1px 10px;
+  border-radius:8px;cursor:pointer;
+  color:var(--nav-text);font-size:13px;font-weight:500;
+  transition:background .15s,color .15s;
+  position:relative;
+}
+.nav-item:hover{background:var(--nav-active);color:var(--nav-text-hover)}
+.nav-item.active{background:var(--nav-active);color:var(--nav-text-active)}
+.nav-item.active::before{
+  content:'';position:absolute;left:-10px;top:50%;transform:translateY(-50%);
+  width:3px;height:20px;border-radius:0 3px 3px 0;background:var(--nav-indicator);
+}
+.nav-item svg{flex-shrink:0;opacity:.7}
+.nav-item.active svg{opacity:1}
+.nav-spacer{flex:1}
+.nav-footer{
+  padding:14px 18px;
+  font-size:10.5px;color:rgba(255,255,255,.2);
+  border-top:1px solid var(--nav-border);
+  letter-spacing:.2px;
+}
+
+/* ── Header ──────────────────────────────────────────── */
+.header-title{font-size:15px;font-weight:600;color:var(--gray-800);flex:1;letter-spacing:-.1px}
+.header-badge{
+  background:var(--accent-glow);color:var(--accent-dark);
+  font-size:11px;padding:3px 10px;border-radius:20px;font-weight:600;
+  border:1px solid rgba(0,195,160,.25);
+}
+.tenant-select{
+  border:1px solid var(--border);border-radius:8px;padding:6px 10px;
+  font-size:13px;background:var(--gray-50);cursor:pointer;outline:none;color:var(--gray-700);
+  transition:border-color .15s;
+}
+.tenant-select:focus{border-color:var(--border-focus);background:#fff}
+
+.btn{
+  display:inline-flex;align-items:center;gap:6px;padding:7px 15px;
+  border-radius:8px;font-size:13px;font-weight:500;cursor:pointer;border:none;
+  transition:all .15s;font-family:var(--font);
+}
+.btn-primary{background:var(--accent);color:#fff;box-shadow:0 1px 3px rgba(0,195,160,.3)}
+.btn-primary:hover{background:var(--accent-dark);box-shadow:0 2px 8px rgba(0,195,160,.4)}
+.btn-outline{background:var(--card-bg);border:1px solid var(--border);color:var(--gray-600)}
+.btn-outline:hover{background:var(--gray-50);border-color:var(--gray-300);color:var(--gray-700)}
+.btn-danger{background:var(--red);color:#fff}
+.btn-danger:hover{background:#b91c1c}
+.btn-sm{padding:5px 11px;font-size:12px}
+.btn:disabled{opacity:.45;cursor:not-allowed}
+
+/* ── Page header ─────────────────────────────────────── */
+.page-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:26px}
+.page-title{font-size:21px;font-weight:700;color:var(--gray-900);letter-spacing:-.3px}
+.page-sub{font-size:13px;color:var(--gray-500);margin-top:3px}
+.actions{display:flex;gap:8px;align-items:center}
+
+/* ── Summary cards ───────────────────────────────────── */
+.cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px}
+.card{
+  background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius-lg);
+  padding:20px 22px;box-shadow:var(--shadow);position:relative;overflow:hidden;
+  transition:transform .15s,box-shadow .15s;
+}
+.card[style*="cursor:pointer"]:hover{
+  transform:translateY(-3px);box-shadow:var(--shadow-md);border-color:var(--gray-300);
+}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--radius-lg) var(--radius-lg) 0 0}
+.card.red::before{background:linear-gradient(90deg,#D93025,#ef4444)}
+.card.orange::before{background:linear-gradient(90deg,#E8650A,#f97316)}
+.card.green::before{background:linear-gradient(90deg,#1E8A44,#22c55e)}
+.card.gray::before{background:linear-gradient(90deg,var(--gray-400),var(--gray-300))}
+.card.blue::before{background:linear-gradient(90deg,var(--accent),var(--blue))}
+.card-label{font-size:10.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;color:var(--gray-500)}
+.card-value{font-size:34px;font-weight:700;margin:8px 0 3px;line-height:1;letter-spacing:-1px}
+.card-value.red{color:var(--red)}
+.card-value.orange{color:var(--orange)}
+.card-value.green{color:var(--green)}
+.card-value.gray{color:var(--gray-400)}
+.card-value.blue{color:var(--accent-dark)}
+.card-sub{font-size:11.5px;color:var(--gray-500)}
+
+/* ── Charts row ──────────────────────────────────────── */
+.charts-row{display:grid;grid-template-columns:320px 1fr;gap:16px;margin-bottom:24px}
+.chart-card{
+  background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius-lg);
+  padding:20px 22px;box-shadow:var(--shadow);
+}
+.chart-title{font-size:12.5px;font-weight:700;color:var(--gray-700);margin-bottom:16px;
+  text-transform:uppercase;letter-spacing:.4px}
+.chart-wrap{position:relative;height:220px;display:flex;align-items:center;justify-content:center}
+
+/* ── Filters ─────────────────────────────────────────── */
+.filters{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+.filter-input{
+  border:1px solid var(--border);border-radius:8px;padding:7px 12px;
+  font-size:13px;outline:none;background:var(--card-bg);min-width:200px;
+  color:var(--gray-800);transition:border-color .15s,box-shadow .15s;font-family:var(--font);
+}
+.filter-input:focus{border-color:var(--border-focus);box-shadow:0 0 0 3px var(--accent-glow)}
+.filter-select{
+  border:1px solid var(--border);border-radius:8px;padding:7px 10px;
+  font-size:13px;background:var(--card-bg);cursor:pointer;outline:none;
+  color:var(--gray-700);transition:border-color .15s;
+}
+.filter-select:focus{border-color:var(--border-focus)}
+.filter-count{font-size:12px;color:var(--gray-500);margin-left:auto;font-weight:500}
+
+/* ── Table ───────────────────────────────────────────── */
+.table-wrap{
+  background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius-lg);
+  box-shadow:var(--shadow);overflow:hidden;
+}
+table{width:100%;border-collapse:collapse}
+thead tr{background:var(--gray-50)}
+th{
+  padding:11px 16px;font-size:11px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.5px;color:var(--gray-500);text-align:left;
+  border-bottom:1px solid var(--border);white-space:nowrap;cursor:pointer;user-select:none;
+  transition:background .1s;
+}
+th:hover{background:var(--gray-100);color:var(--gray-700)}
+th .sort-icon{margin-left:4px;opacity:.4}
+td{
+  padding:11px 16px;font-size:13px;border-bottom:1px solid var(--gray-100);
+  vertical-align:middle;color:var(--gray-700);
+}
+tr:last-child td{border-bottom:none}
+tbody tr:hover td{background:rgba(0,195,160,.04)}
+
+/* ── Status badges ───────────────────────────────────── */
+.badge{
+  display:inline-flex;align-items:center;gap:5px;padding:3px 10px;
+  border-radius:20px;font-size:11.5px;font-weight:600;letter-spacing:.1px;
+}
+.badge.eol{background:var(--red-light);color:var(--red)}
+.badge.eol_soon{background:var(--orange-light);color:var(--orange)}
+.badge.supported{background:var(--green-light);color:var(--green)}
+.badge.unknown{background:var(--gray-100);color:var(--gray-600)}
+.badge.not_tracked{background:var(--gray-100);color:var(--gray-400)}
+.dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.dot.eol{background:var(--red)}
+.dot.eol_soon{background:var(--orange)}
+.dot.supported{background:var(--green)}
+.dot.unknown{background:var(--gray-400)}
+.dot.not_tracked{background:var(--gray-300)}
+
+/* ── Asset detail modal ──────────────────────────────── */
+.detail-modal{
+  background:var(--card-bg);border-radius:var(--radius-lg);width:820px;max-width:95vw;
+  max-height:90vh;display:flex;flex-direction:column;
+  box-shadow:var(--shadow-lg);overflow:hidden;
+}
+.detail-header{
+  padding:22px 26px 18px;border-bottom:1px solid var(--border);
+  display:flex;align-items:flex-start;gap:16px;flex-shrink:0;
+  background:var(--gray-50);
+}
+.detail-header-icon{
+  width:44px;height:44px;border-radius:10px;
+  background:linear-gradient(135deg,var(--accent),var(--blue));
+  display:flex;align-items:center;justify-content:center;flex-shrink:0;
+  box-shadow:0 2px 8px rgba(0,195,160,.3);
+}
+.detail-header-text{flex:1;min-width:0}
+.detail-title{
+  font-size:16px;font-weight:700;color:var(--gray-900);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;letter-spacing:-.2px;
+}
+.detail-subtitle{font-size:12px;color:var(--gray-500);margin-top:3px}
+.detail-body{flex:1;overflow-y:auto;padding:22px 26px}
+.detail-section{margin-bottom:24px}
+.detail-section-title{
+  font-size:10.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;
+  color:var(--gray-400);margin-bottom:12px;padding-bottom:8px;
+  border-bottom:1px solid var(--gray-200);
+}
+.attr-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px}
+.attr-item{background:var(--gray-50);border-radius:8px;padding:9px 12px;border:1px solid var(--gray-200)}
+.attr-label{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-400);margin-bottom:3px}
+.attr-value{font-size:13px;color:var(--gray-800);word-break:break-all;font-weight:500}
+.attr-value.mono{font-family:'SF Mono',Monaco,monospace;font-size:11.5px;font-weight:400}
+.eol-table{width:100%;border-collapse:collapse;font-size:13px}
+.eol-table th{
+  padding:8px 12px;font-size:10.5px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.4px;color:var(--gray-500);text-align:left;
+  background:var(--gray-50);border-bottom:1px solid var(--border);
+}
+.eol-table td{padding:9px 12px;border-bottom:1px solid var(--gray-100);vertical-align:middle}
+.eol-table tr:last-child td{border-bottom:none}
+.eol-table tbody tr:hover td{background:rgba(0,195,160,.04)}
+.software-list{display:flex;flex-direction:column;gap:4px;max-height:280px;overflow-y:auto}
+.software-item{
+  font-size:11.5px;font-family:'SF Mono',Monaco,monospace;padding:5px 10px;
+  background:var(--gray-50);border-radius:6px;color:var(--gray-700);
+  word-break:break-all;border:1px solid var(--gray-200);
+}
+.tag-pill{
+  display:inline-flex;gap:3px;background:#EFF6FF;border-radius:12px;
+  padding:3px 10px;font-size:11.5px;color:#2563EB;margin:2px;
+  border:1px solid #BFDBFE;font-weight:500;
+}
+.acr-badge{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:40px;height:40px;border-radius:50%;font-size:15px;font-weight:700;
+  border:3px solid var(--border);
+}
+.acr-low{border-color:var(--green);color:var(--green)}
+.acr-mid{border-color:var(--yellow);color:var(--orange)}
+.acr-high{border-color:var(--red);color:var(--red)}
+
+/* ── Settings ────────────────────────────────────────── */
+.settings-section{
+  background:var(--card-bg);border:1px solid var(--border);border-radius:var(--radius-lg);
+  padding:24px 26px;box-shadow:var(--shadow);margin-bottom:20px;
+}
+.settings-title{font-size:14.5px;font-weight:700;margin-bottom:18px;color:var(--gray-900);letter-spacing:-.1px}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-group{display:flex;flex-direction:column;gap:5px}
+.form-group.full{grid-column:1/-1}
+label{font-size:12px;font-weight:600;color:var(--gray-600);letter-spacing:.2px}
+input[type=text],input[type=password],input[type=url]{
+  border:1px solid var(--border);border-radius:8px;padding:8px 12px;
+  font-size:13px;outline:none;font-family:var(--font);color:var(--gray-800);
+  background:var(--card-bg);transition:border-color .15s,box-shadow .15s;
+}
+input[type=text]:focus,input[type=password]:focus,input[type=url]:focus{
+  border-color:var(--border-focus);box-shadow:0 0 0 3px var(--accent-glow);
+}
+.tenant-list{display:grid;gap:12px}
+.tenant-card{
+  border:1px solid var(--border);border-radius:var(--radius);padding:16px 18px;
+  display:flex;align-items:center;gap:14px;background:var(--card-bg);
+  transition:border-color .15s,box-shadow .15s;
+}
+.tenant-card:hover{border-color:var(--gray-300);box-shadow:var(--shadow-sm)}
+.tenant-info{flex:1}
+.tenant-name{font-weight:600;font-size:14px;color:var(--gray-900)}
+.tenant-url{font-size:12px;color:var(--gray-500);margin-top:2px}
+.tenant-actions{display:flex;gap:8px}
+
+/* ── Modal ───────────────────────────────────────────── */
+.modal-overlay{position:fixed;inset:0;background:rgba(15,23,42,.5);backdrop-filter:blur(2px);
+  display:flex;align-items:center;justify-content:center;z-index:1000;display:none}
+.modal-overlay.open{display:flex}
+.modal{
+  background:var(--card-bg);border-radius:var(--radius-lg);padding:28px;width:500px;
+  max-width:90vw;box-shadow:var(--shadow-lg);border:1px solid var(--border);
+}
+.modal-title{font-size:17px;font-weight:700;margin-bottom:20px;color:var(--gray-900);letter-spacing:-.2px}
+.modal-footer{display:flex;gap:8px;justify-content:flex-end;margin-top:22px;padding-top:18px;border-top:1px solid var(--border)}
+
+/* ── Loader / Toast ──────────────────────────────────── */
+.spinner{
+  display:inline-block;width:18px;height:18px;
+  border:2px solid rgba(0,195,160,.2);border-top-color:var(--accent);
+  border-radius:50%;animation:spin .7s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.toast-container{position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:8px;z-index:2000}
+.toast{
+  background:var(--gray-900);color:#fff;padding:12px 18px;border-radius:10px;font-size:13px;
+  box-shadow:var(--shadow-md);animation:slideIn .2s ease;min-width:250px;font-weight:500;
+  border:1px solid rgba(255,255,255,.08);
+}
+.toast.error{background:#7F1D1D;border-color:rgba(239,68,68,.3)}
+.toast.success{background:#14532D;border-color:rgba(34,197,94,.3)}
+@keyframes slideIn{from{transform:translateX(70px);opacity:0}to{transform:none;opacity:1}}
+@keyframes indeterminate{0%{transform:translateX(-100%)}100%{transform:translateX(400%)}}
+#progress-bar.indeterminate{width:35%!important;animation:indeterminate 1.4s ease-in-out infinite;background:var(--accent)}
+.empty-state{text-align:center;padding:70px 20px;color:var(--gray-400)}
+.empty-state svg{margin-bottom:14px;opacity:.4}
+.empty-state p{font-size:15px;font-weight:600;margin-bottom:5px;color:var(--gray-500)}
+.empty-state small{font-size:13px;color:var(--gray-400)}
+.refresh-info{font-size:12px;color:var(--gray-400);display:flex;align-items:center;gap:4px}
+.last-refresh{font-size:11px;color:var(--gray-400)}
+.expand-row{background:var(--gray-50);border-top:1px solid var(--gray-100)}
+.expand-row td{padding:0}
+.widgets-row{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px}
+</style>
+</head>
+<body>
+<div id="app">
+<!-- ── Sidebar nav ────────────────────────────────────── -->
+<nav>
+  <div class="nav-logo">
+    <div class="nav-logo-row">
+      <!-- Tenable geometric mark -->
+      <svg class="nav-logo-mark" width="30" height="34" viewBox="0 0 30 34" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <!-- Outer hexagon -->
+        <path d="M15 1L28 8.5V25.5L15 33L2 25.5V8.5L15 1Z" stroke="white" stroke-width="1.5" fill="none" opacity=".9"/>
+        <!-- Middle ring -->
+        <path d="M15 7L23 11.5V20.5L15 25L7 20.5V11.5L15 7Z" fill="rgba(255,255,255,0.12)" stroke="white" stroke-width="1" opacity=".7"/>
+        <!-- Center facet -->
+        <path d="M15 12L20 14.75V19.25L15 22L10 19.25V14.75L15 12Z" fill="white" opacity=".95"/>
+        <!-- Facet lines for 3D depth -->
+        <line x1="15" y1="1" x2="15" y2="12" stroke="white" stroke-width=".75" opacity=".35"/>
+        <line x1="2" y1="8.5" x2="10" y2="14.75" stroke="white" stroke-width=".75" opacity=".35"/>
+        <line x1="28" y1="8.5" x2="20" y2="14.75" stroke="white" stroke-width=".75" opacity=".35"/>
+        <line x1="15" y1="33" x2="15" y2="22" stroke="white" stroke-width=".75" opacity=".35"/>
+        <line x1="2" y1="25.5" x2="10" y2="19.25" stroke="white" stroke-width=".75" opacity=".35"/>
+        <line x1="28" y1="25.5" x2="20" y2="19.25" stroke="white" stroke-width=".75" opacity=".35"/>
+      </svg>
+      <span class="nav-logo-text">tenable</span>
+    </div>
+    <span class="nav-logo-sub">EOL Portal</span>
+  </div>
+  <div class="nav-section">Main</div>
+  <div class="nav-item active" onclick="showPage('dashboard')">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+    Dashboard
+  </div>
+  <div class="nav-item" onclick="showPage('assets')">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><line x1="12" y1="12" x2="12" y2="12"/></svg>
+    Asset Inventory
+  </div>
+  <div class="nav-item" onclick="showPage('software')">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+    Software Inventory
+  </div>
+  <div class="nav-section">EOL Analysis</div>
+  <div class="nav-item" onclick="showPage('os-eol')">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+    OS End of Life
+  </div>
+  <div class="nav-item" onclick="showPage('app-eol')">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+    App End of Life
+  </div>
+  <div class="nav-section">Config</div>
+  <div class="nav-item" onclick="showPage('settings')">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.07 4.93A10 10 0 0 0 4.93 19.07M19.07 19.07A10 10 0 0 0 4.93 4.93"/><path d="M12 2v2m0 18v2M2 12h2m18 0h2"/></svg>
+    Tenants
+  </div>
+  <div class="nav-spacer"></div>
+  <div class="nav-footer">Powered by endoflife.date</div>
+</nav>
+
+<!-- ── Main content ───────────────────────────────────── -->
+<main>
+  <header>
+    <div class="header-title" id="header-title">OS EOL Dashboard</div>
+    <select class="tenant-select" id="tenant-select" onchange="onTenantChange()">
+      <option value="">— Select tenant —</option>
+    </select>
+    <button class="btn btn-primary btn-sm" id="full-sync-btn" onclick="startSync()" title="Re-fetch all assets from Tenable">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+      Sync
+    </button>
+    <button id="refresh-btn" style="display:none"></button>
+    <span class="last-refresh" id="last-refresh"></span>
+  </header>
+
+  <!-- Dashboard page -->
+  <div class="content" id="page-dashboard">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Operating Systems EOL Overview</div>
+        <div class="page-sub">OS end-of-life status across your Tenable-managed assets</div>
+      </div>
+      <div class="actions">
+        <select class="filter-select" id="dash-tag-filter" onchange="updateCards();updateCharts();updateDashWidgets()" style="display:none">
+          <option value="">All tags</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="cards" id="summary-cards">
+      <div class="card red"  style="cursor:pointer" title="Click to view EOL assets" onclick="drillToAssets('eol')">
+        <div class="card-label">End of Life</div>
+        <div class="card-value red"    id="cnt-eol">—</div>
+        <div class="card-sub">Requires immediate action</div>
+      </div>
+      <div class="card orange" style="cursor:pointer" title="Click to view EOL Soon assets" onclick="drillToAssets('eol_soon')">
+        <div class="card-label">EOL Within 90 Days</div>
+        <div class="card-value orange" id="cnt-soon">—</div>
+        <div class="card-sub">Plan migration now</div>
+      </div>
+      <div class="card green"  style="cursor:pointer" title="Click to view supported assets" onclick="drillToAssets('supported')">
+        <div class="card-label">Supported</div>
+        <div class="card-value green"  id="cnt-supported">—</div>
+        <div class="card-sub">Within vendor support</div>
+      </div>
+      <div class="card gray"   style="cursor:pointer" title="Click to view unknown assets" onclick="drillToAssets('unknown')">
+        <div class="card-label">Unknown</div>
+        <div class="card-value gray"   id="cnt-unknown">—</div>
+        <div class="card-sub">OS not identified</div>
+      </div>
+      <div class="card blue"   style="cursor:pointer" title="Click to view all assets" onclick="drillToAssets('')">
+        <div class="card-label">Total Assets</div>
+        <div class="card-value blue"   id="cnt-total">—</div>
+        <div class="card-sub" id="cnt-tenant-info">No tenant selected</div>
+      </div>
+    </div>
+
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="chart-title">OS EOL Status Distribution</div>
+        <div class="chart-wrap"><canvas id="donut-chart"></canvas></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Assets by OS EOL Status</div>
+        <div class="chart-wrap"><canvas id="bar-chart"></canvas></div>
+      </div>
+    </div>
+
+    <!-- Row 2: Upcoming EOLs + Top EOL OS Versions -->
+    <div class="widgets-row">
+      <div class="chart-card">
+        <div class="chart-title">Upcoming EOLs
+          <span style="font-weight:400;text-transform:none;letter-spacing:0;color:var(--gray-400);font-size:11px;margin-left:4px">— next 180 days</span>
+        </div>
+        <div id="upcoming-eols-body" style="overflow-y:auto;max-height:256px"></div>
+      </div>
+      <div class="chart-card">
+        <div class="chart-title">Top EOL OS Versions</div>
+        <div id="top-eol-oses-body" style="overflow-y:auto;max-height:256px"></div>
+      </div>
+    </div>
+
+    <!-- Row 3: EOL by Tag (full width) -->
+    <div class="chart-card" style="margin-bottom:24px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+        <div class="chart-title" style="margin-bottom:0">EOL Status by Tag</div>
+        <select id="tag-breakdown-cat" class="filter-select" style="font-size:12px;padding:5px 8px" onchange="renderEolByTag()">
+          <option value="">— select category —</option>
+        </select>
+      </div>
+      <div class="chart-wrap" id="eol-by-tag-chart-wrap" style="height:220px;display:none"><canvas id="tag-bar-chart"></canvas></div>
+      <div id="eol-by-tag-empty" style="text-align:center;padding:30px 20px;color:var(--gray-400);font-size:13px">Select a tag category above to compare EOL status across tag values</div>
+    </div>
+
+    <div id="dash-loading" style="display:none;text-align:center;padding:40px">
+      <div class="spinner"></div>
+      <p id="dash-loading-msg" style="margin-top:12px;color:var(--gray-600);font-size:13px">Starting…</p>
+      <div id="progress-bar-wrap" style="display:none;margin:14px auto 0;max-width:380px">
+        <div style="font-size:12px;color:var(--gray-400);margin-bottom:6px" id="progress-msg"></div>
+        <div style="background:var(--gray-200);border-radius:8px;height:14px;overflow:hidden">
+          <div id="progress-bar" style="height:100%;background:var(--accent);border-radius:8px;
+            transition:width .4s ease;min-width:0;font-size:10px;color:#fff;
+            display:flex;align-items:center;justify-content:center;width:0%"></div>
+        </div>
+      </div>
+    </div>
+    <div id="dash-empty" class="empty-state" style="display:none">
+      <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+      <p>No tenant selected</p>
+      <small>Choose a tenant from the dropdown above, or add one in <a href="#" onclick="showPage('settings')">Tenants</a>.</small>
+    </div>
+  </div>
+
+  <!-- Assets page -->
+  <div class="content" id="page-assets" style="display:none">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Asset Inventory</div>
+        <div class="page-sub">Detailed EOL status per asset</div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-outline btn-sm" onclick="exportCSV()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export CSV
+        </button>
+      </div>
+    </div>
+
+    <div class="filters">
+      <input class="filter-input" type="text" id="search-input" placeholder="Search hostname, IP, OS…" oninput="renderTable()">
+      <select class="filter-select" id="status-filter" onchange="renderTable()">
+        <option value="">All statuses</option>
+        <option value="eol">EOL</option>
+        <option value="eol_soon">EOL Soon</option>
+        <option value="supported">Supported</option>
+        <option value="unknown">Unknown</option>
+      </select>
+      <select class="filter-select" id="os-filter" onchange="renderTable()">
+        <option value="">All OS families</option>
+      </select>
+      <select class="filter-select" id="tag-filter" onchange="renderTable()">
+        <option value="">All tags</option>
+      </select>
+      <span class="filter-count" id="filter-count"></span>
+    </div>
+
+    <div class="table-wrap" id="assets-table-wrap">
+      <div id="assets-loading" style="display:none;text-align:center;padding:40px">
+        <div class="spinner"></div>
+        <p style="margin-top:12px;color:var(--gray-600);font-size:13px">Loading assets…</p>
+      </div>
+      <div id="assets-empty" class="empty-state">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+        <p>No assets loaded</p>
+        <small>Select a tenant and click Refresh.</small>
+      </div>
+      <table id="assets-table" style="display:none">
+        <thead>
+          <tr>
+            <th onclick="sortTable('name')">Hostname/IP <span class="sort-icon" id="sort-name">↕</span></th>
+            <th onclick="sortTable('os')">Operating System <span class="sort-icon" id="sort-os">↕</span></th>
+            <th onclick="sortTable('os_status')">OS EOL Status <span class="sort-icon" id="sort-os_status">↕</span></th>
+            <th onclick="sortTable('os_eol_date')">OS EOL Date <span class="sort-icon" id="sort-os_eol_date">↕</span></th>
+            <th onclick="sortTable('os_days')">OS Days Remaining <span class="sort-icon" id="sort-os_days">↕</span></th>
+            <th onclick="sortTable('app_status')">App EOL <span class="sort-icon" id="sort-app_status">↕</span></th>
+            <th onclick="sortTable('last_seen')">Last Seen <span class="sort-icon" id="sort-last_seen">↕</span></th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="assets-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- OS EOL page -->
+  <div class="content" id="page-os-eol" style="display:none">
+    <div class="page-header">
+      <div>
+        <div class="page-title">OS End of Life</div>
+        <div class="page-sub">Operating system EOL status per asset, sorted by urgency</div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-outline btn-sm" onclick="exportOsCSV()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export CSV
+        </button>
+      </div>
+    </div>
+    <div class="cards" id="os-summary-cards" style="margin-bottom:20px"></div>
+    <div class="filters">
+      <input class="filter-input" type="text" id="os-search" placeholder="Search hostname, IP, OS…" oninput="renderOsTable()">
+      <select class="filter-select" id="os-status-filter" onchange="renderOsTable()">
+        <option value="">All statuses</option>
+        <option value="eol">EOL</option>
+        <option value="eol_soon">EOL Soon</option>
+        <option value="supported">Supported</option>
+        <option value="unknown">Unknown</option>
+      </select>
+      <select class="filter-select" id="os-tag-filter" onchange="renderOsTable()" style="display:none">
+        <option value="">All tags</option>
+      </select>
+      <span class="filter-count" id="os-filter-count"></span>
+    </div>
+    <div class="table-wrap">
+      <div id="os-empty" class="empty-state" style="display:none">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+        <p>No data</p><small>Select a tenant and sync data first.</small>
+      </div>
+      <table id="os-table" style="display:none">
+        <thead><tr>
+          <th onclick="sortOsTable('name')">Asset <span class="sort-icon" id="os-sort-name">↕</span></th>
+          <th onclick="sortOsTable('os')">Operating System <span class="sort-icon" id="os-sort-os">↕</span></th>
+          <th onclick="sortOsTable('status')">EOL Status <span class="sort-icon" id="os-sort-status">↕</span></th>
+          <th onclick="sortOsTable('eol_date')">EOL Date <span class="sort-icon" id="os-sort-eol_date">↕</span></th>
+          <th onclick="sortOsTable('days_remaining')">Days Remaining <span class="sort-icon" id="os-sort-days_remaining">↕</span></th>
+          <th onclick="sortOsTable('last_seen')">Last Seen <span class="sort-icon" id="os-sort-last_seen">↕</span></th>
+          <th></th>
+        </tr></thead>
+        <tbody id="os-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- App EOL page -->
+  <div class="content" id="page-app-eol" style="display:none">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Application End of Life</div>
+        <div class="page-sub">All detected software sorted by days to end of life</div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-outline btn-sm" onclick="exportAppCSV()">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          Export CSV
+        </button>
+      </div>
+    </div>
+    <div class="cards" id="app-summary-cards" style="margin-bottom:20px"></div>
+    <div class="filters">
+      <input class="filter-input" type="text" id="app-search" placeholder="Search application name…" oninput="renderAppTable()">
+      <select class="filter-select" id="app-status-filter" onchange="renderAppTable()">
+        <option value="">All statuses</option>
+        <option value="eol">EOL</option>
+        <option value="eol_soon">EOL Soon</option>
+        <option value="supported">Supported</option>
+        <option value="unknown">Unknown</option>
+      </select>
+      <select class="filter-select" id="app-tag-filter" onchange="renderAppTable()" style="display:none">
+        <option value="">All tags</option>
+      </select>
+      <span class="filter-count" id="app-filter-count"></span>
+    </div>
+    <div class="table-wrap">
+      <div id="app-empty" class="empty-state" style="display:none">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        <p>No application EOL data</p><small>Select a tenant and sync data first.</small>
+      </div>
+      <table id="app-table" style="display:none">
+        <thead><tr>
+          <th onclick="sortAppTable('name')">Application <span class="sort-icon" id="app-sort-name">↕</span></th>
+          <th onclick="sortAppTable('version')">Version <span class="sort-icon" id="app-sort-version">↕</span></th>
+          <th onclick="sortAppTable('status')">EOL Status <span class="sort-icon" id="app-sort-status">↕</span></th>
+          <th onclick="sortAppTable('eol_date')">EOL Date <span class="sort-icon" id="app-sort-eol_date">↕</span></th>
+          <th onclick="sortAppTable('days_remaining')">Days Remaining <span class="sort-icon" id="app-sort-days_remaining">↕</span></th>
+          <th onclick="sortAppTable('asset_count')">Affected Assets <span class="sort-icon" id="app-sort-asset_count">↕</span></th>
+          <th></th>
+        </tr></thead>
+        <tbody id="app-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+
+  <!-- Software Inventory page -->
+  <div class="content" id="page-software" style="display:none">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Software Inventory</div>
+        <div class="page-sub">All detected software across your estate — expand a product to see versions and affected assets</div>
+      </div>
+    </div>
+
+    <div class="filters">
+      <input class="filter-input" type="text" id="sw-query"
+             placeholder="Filter by product or vendor name…"
+             oninput="renderSoftwareInventory()">
+      <select class="filter-select" id="sw-status-filter" onchange="renderSoftwareInventory()">
+        <option value="">All statuses</option>
+        <option value="eol">EOL</option>
+        <option value="eol_soon">EOL Soon</option>
+        <option value="supported">Supported</option>
+        <option value="not_tracked">Not tracked</option>
+      </select>
+      <select class="filter-select" id="sw-tag-filter" onchange="loadSoftwareInventory()" style="display:none">
+        <option value="">All tags</option>
+      </select>
+      <span class="filter-count" id="sw-filter-count"></span>
+    </div>
+
+    <div class="table-wrap">
+      <div id="sw-empty" class="empty-state">
+        <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        <p>No software data yet</p><small>Select a tenant and sync data first.</small>
+      </div>
+      <table id="sw-table" style="display:none">
+        <thead><tr>
+          <th style="width:40%">Product</th>
+          <th style="width:10%">Versions</th>
+          <th style="width:10%">Assets</th>
+          <th style="width:20%">Worst Status</th>
+          <th style="width:20%"></th>
+        </tr></thead>
+        <tbody id="sw-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Settings page -->
+  <div class="content" id="page-settings" style="display:none">
+    <div class="page-header">
+      <div>
+        <div class="page-title">Tenant Configuration</div>
+        <div class="page-sub">Connect to one or more Tenable VM instances</div>
+      </div>
+      <div class="actions">
+        <button class="btn btn-primary" onclick="openAddModal()">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+          Add Tenant
+        </button>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-title">Connected Tenants</div>
+      <div class="tenant-list" id="tenant-list">
+        <p style="color:var(--gray-400);font-size:13px">No tenants configured. Add one above.</p>
+      </div>
+    </div>
+
+    <div class="settings-section">
+      <div class="settings-title">Notes</div>
+      <ul style="font-size:13px;color:var(--gray-600);line-height:2;padding-left:18px">
+        <li>API credentials are <strong>encrypted at rest</strong> using a per-install key file — they are never stored in plaintext.</li>
+        <li>Assets are pulled via the <strong>Tenable VM Assets Export API</strong> (no 5 000-asset cap) — scoped to <strong>VM scanner sources only</strong> (NESSUS_SCAN + NESSUS_AGENT) and assets <strong>last seen within 90 days</strong>.</li>
+        <li>Both OS strings and <strong>installed software CPE data</strong> are matched against <a href="https://endoflife.date" target="_blank">endoflife.date</a> for EOL dates. 50+ products are mapped. EOL data is cached locally and survives restarts.</li>
+        <li><strong>Asset tags</strong> from Tenable are fetched during sync — tag filters are available on every page (Dashboard, Asset Inventory, OS EOL, App EOL, Software Inventory) to scope any view by environment, owner, or any other tag category.</li>
+        <li>The <strong>Operating Systems EOL Overview</strong> dashboard is interactive — each summary card is clickable and navigates directly to the OS EOL page with the matching status and tag filter pre-applied.</li>
+        <li>Click any row in the Asset Inventory to open the <strong>Drill Down</strong> panel showing identity attributes, scan metadata, ACR/AES risk scores, full EOL analysis, tags, and raw software CPE inventory.</li>
+      </ul>
+    </div>
+  </div>
+</main>
+</div>
+
+<!-- Asset Detail Modal -->
+<div class="modal-overlay" id="asset-modal">
+  <div class="detail-modal">
+    <div class="detail-header">
+      <div class="detail-header-icon">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/><line x1="12" y1="12" x2="12" y2="12"/></svg>
+      </div>
+      <div class="detail-header-text">
+        <div class="detail-title" id="dm-name">—</div>
+        <div class="detail-subtitle" id="dm-subtitle">—</div>
+      </div>
+      <span id="dm-status-badge" class="badge" style="flex-shrink:0"></span>
+      <button class="btn btn-outline btn-sm" onclick="closeAssetModal()" style="flex-shrink:0">✕ Close</button>
+    </div>
+    <div class="detail-body" id="asset-modal-body">
+      <!-- filled by JS -->
+    </div>
+  </div>
+</div>
+
+<!-- Add/Edit Tenant Modal -->
+<div class="modal-overlay" id="tenant-modal">
+  <div class="modal">
+    <div class="modal-title" id="modal-title">Add Tenant</div>
+    <div class="form-grid">
+      <div class="form-group full">
+        <label>Display Name</label>
+        <input type="text" id="f-name" placeholder="e.g. Prod – US East">
+      </div>
+      <div class="form-group full">
+        <label>Tenable VM URL</label>
+        <input type="url" id="f-url" placeholder="https://cloud.tenable.com">
+      </div>
+      <div class="form-group">
+        <label>Access Key</label>
+        <input type="text" id="f-access" placeholder="API access key" autocomplete="off">
+      </div>
+      <div class="form-group">
+        <label>Secret Key</label>
+        <input type="password" id="f-secret" placeholder="API secret key" autocomplete="off">
+      </div>
+    </div>
+    <div id="modal-err" style="color:var(--red);font-size:12px;margin-top:8px;display:none"></div>
+    <div class="modal-footer">
+      <button class="btn btn-outline" onclick="closeModal()">Cancel</button>
+      <button class="btn btn-outline btn-sm" onclick="testModal()" id="test-btn">Test Connection</button>
+      <button class="btn btn-primary" onclick="saveModal()" id="save-btn">Save</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div class="toast-container" id="toasts"></div>
+
+<script>
+// ── State ──────────────────────────────────────────────
+let allAssets = [];
+let filteredAssets = [];
+let sortField = 'overall_status';
+let sortDir = 1;
+let editingTenantId = null;
+
+// ── Shared pagination ───────────────────────────────────
+const PAGE_SIZE = 50;
+let assetsPage = 0;
+let osPage     = 0;
+let appPage    = 0;
+
+// Appends a prev/next pagination row to any table tbody.
+// gotoFn receives the new page number.
+function appendPaginationRow(tbody, page, totalItems, gotoFn, colspan) {
+  const totalPages = Math.ceil(totalItems / PAGE_SIZE);
+  if (totalPages <= 1) return;
+  const row = document.createElement('tr');
+  const td  = document.createElement('td');
+  td.colSpan = colspan;
+  td.style.cssText = 'text-align:center;padding:12px 0;border-top:1px solid var(--gray-100)';
+  const wrap = document.createElement('div');
+  wrap.style.cssText = 'display:inline-flex;align-items:center;gap:12px;font-size:13px';
+  const prev = document.createElement('button');
+  prev.className = 'btn btn-outline btn-sm';
+  prev.textContent = '← Previous';
+  prev.disabled = page === 0;
+  prev.onclick = () => gotoFn(page - 1);
+  const label = document.createElement('span');
+  label.style.color = 'var(--gray-500)';
+  label.textContent = `Page ${page + 1} of ${totalPages}`;
+  const next = document.createElement('button');
+  next.className = 'btn btn-outline btn-sm';
+  next.textContent = 'Next →';
+  next.disabled = page >= totalPages - 1;
+  next.onclick = () => gotoFn(page + 1);
+  wrap.appendChild(prev); wrap.appendChild(label); wrap.appendChild(next);
+  td.appendChild(wrap); row.appendChild(td); tbody.appendChild(row);
+}
+let donutChart = null;
+let barChart = null;
+let tagBarChart = null;
+let currentTenantId = null;
+
+// ── Init ───────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  await loadTenants();
+  showPage('dashboard');
+  // Show empty state if no tenant
+  const sel = document.getElementById('tenant-select');
+  if (!sel.value) showDashEmpty();
+});
+
+
+// ── Pages ──────────────────────────────────────────────
+const ALL_PAGES = ['dashboard','assets','os-eol','app-eol','software','settings'];
+function showPage(name) {
+  ALL_PAGES.forEach(p => {
+    document.getElementById('page-'+p).style.display = p===name ? '' : 'none';
+  });
+  document.querySelectorAll('.nav-item').forEach(el => {
+    const oc = el.getAttribute('onclick') || '';
+    el.classList.toggle('active', oc.includes("'"+name+"'"));
+  });
+  const titles = {
+    dashboard:  'OS EOL Dashboard',
+    assets:     'Asset Inventory',
+    'os-eol':   'OS End of Life',
+    'app-eol':  'Application End of Life',
+    software:   'Software Inventory',
+    settings:   'Tenant Configuration',
+  };
+  document.getElementById('header-title').textContent = titles[name] || '';
+  if (name === 'assets'  && allAssets.length > 0) renderTable();
+  if (name === 'os-eol'  && allAssets.length > 0) renderOsTable();
+  if (name === 'app-eol' && allAssets.length > 0) renderAppTable();
+  if (name === 'software') initSoftwarePage();
+}
+
+// ── Tenants ────────────────────────────────────────────
+async function loadTenants() {
+  const r = await fetch('/api/tenants');
+  const tenants = await r.json();
+  const sel = document.getElementById('tenant-select');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— Select tenant —</option>';
+  tenants.forEach(t => {
+    const o = document.createElement('option');
+    o.value = t.id; o.textContent = t.name;
+    sel.appendChild(o);
+  });
+  if (prev) sel.value = prev;
+
+  // Render settings list
+  const list = document.getElementById('tenant-list');
+  if (!tenants.length) {
+    list.innerHTML = '<p style="color:var(--gray-400);font-size:13px">No tenants configured.</p>';
+    return;
+  }
+  list.innerHTML = tenants.map(t => `
+    <div class="tenant-card">
+      <div style="width:36px;height:36px;background:var(--accent);border-radius:8px;display:flex;align-items:center;justify-content:center;flex-shrink:0">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2"/></svg>
+      </div>
+      <div class="tenant-info">
+        <div class="tenant-name">${esc(t.name)}</div>
+        <div class="tenant-url">${esc(t.url)}</div>
+      </div>
+      <div class="tenant-actions">
+        <button class="btn btn-outline btn-sm" onclick="testTenant('${t.id}')">Test</button>
+        <button class="btn btn-outline btn-sm" onclick="openEditModal('${t.id}','${esc(t.name)}','${esc(t.url)}')">Edit</button>
+        <button class="btn btn-danger btn-sm" onclick="deleteTenant('${t.id}')">Delete</button>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function deleteTenant(id) {
+  if (!confirm('Delete this tenant? Cached data will be cleared.')) return;
+  await fetch('/api/tenants/'+id, {method:'DELETE'});
+  if (currentTenantId === id) { allAssets = []; currentTenantId = null; resetCards(); }
+  await loadTenants();
+  toast('Tenant removed');
+}
+
+async function testTenant(id) {
+  toast('Testing connection…');
+  const r = await fetch('/api/tenants/'+id+'/test');
+  const d = await r.json();
+  if (d.ok) toast('Connection successful ✓', 'success');
+  else toast('Connection failed: '+d.error, 'error');
+}
+
+// ── Modal ──────────────────────────────────────────────
+function openAddModal() {
+  editingTenantId = null;
+  document.getElementById('modal-title').textContent = 'Add Tenant';
+  ['f-name','f-url','f-access','f-secret'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('f-access').placeholder = 'API access key';
+  document.getElementById('f-secret').placeholder = 'API secret key';
+  hideModalErr();
+  document.getElementById('tenant-modal').classList.add('open');
+}
+
+function openEditModal(id, name, url) {
+  editingTenantId = id;
+  document.getElementById('modal-title').textContent = 'Edit Tenant';
+  document.getElementById('f-name').value = name;
+  document.getElementById('f-url').value = url;
+  // Leave credentials blank — only submit if the user types new values
+  document.getElementById('f-access').value = '';
+  document.getElementById('f-access').placeholder = 'Leave blank to keep existing key';
+  document.getElementById('f-secret').value = '';
+  document.getElementById('f-secret').placeholder = 'Leave blank to keep existing key';
+  hideModalErr();
+  document.getElementById('tenant-modal').classList.add('open');
+}
+
+function closeModal() { document.getElementById('tenant-modal').classList.remove('open'); }
+
+function hideModalErr() { const e = document.getElementById('modal-err'); e.style.display='none'; e.textContent=''; }
+
+async function testModal() {
+  const body = getModalBody();
+  if (!body) return;
+  document.getElementById('test-btn').disabled = true;
+  document.getElementById('test-btn').textContent = 'Testing…';
+  // Temporarily save & test, then delete
+  const r = await fetch('/api/tenants', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  if (!r.ok) { const d = await r.json(); showModalErr(d.error); return; }
+  const {id} = await r.json();
+  const tr = await fetch('/api/tenants/'+id+'/test');
+  const td = await tr.json();
+  await fetch('/api/tenants/'+id, {method:'DELETE'});
+  document.getElementById('test-btn').disabled = false;
+  document.getElementById('test-btn').textContent = 'Test Connection';
+  if (td.ok) { showModalErr('Connection successful!'); document.getElementById('modal-err').style.color='var(--green)'; }
+  else showModalErr('Failed: '+td.error);
+}
+
+function getModalBody() {
+  const name = document.getElementById('f-name').value.trim();
+  const url = document.getElementById('f-url').value.trim();
+  const access_key = document.getElementById('f-access').value.trim();
+  const secret_key = document.getElementById('f-secret').value.trim();
+  if (!name || !url || !access_key) { showModalErr('Name, URL, and Access Key are required.'); return null; }
+  return {name, url, access_key, secret_key};
+}
+
+function showModalErr(msg) {
+  const e = document.getElementById('modal-err');
+  e.textContent = msg; e.style.display=''; e.style.color='var(--red)';
+}
+
+async function saveModal() {
+  const body = getModalBody();
+  if (!body) return;
+  const btn = document.getElementById('save-btn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  let r;
+  if (editingTenantId) {
+    r = await fetch('/api/tenants/'+editingTenantId, {method:'PUT', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  } else {
+    r = await fetch('/api/tenants', {method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  }
+  btn.disabled = false; btn.textContent = 'Save';
+  if (r.ok) { closeModal(); await loadTenants(); toast('Tenant saved', 'success'); }
+  else { const d = await r.json(); showModalErr(d.error || 'Save failed'); }
+}
+
+// ── Tenant change & data loading ───────────────────────
+function onTenantChange() {
+  const id = document.getElementById('tenant-select').value;
+  currentTenantId = id || null;
+  if (!id) { resetCards(); showDashEmpty(); allAssets = []; renderTable(); return; }
+  // Load from DB immediately, then show sync status
+  loadFromDB();
+}
+
+// Load whatever is in the local DB right now – instant
+async function loadFromDB() {
+  if (!currentTenantId) return;
+  // Hide the "no tenant" empty state immediately — a tenant is now selected
+  document.getElementById('dash-empty').style.display = 'none';
+  const r = await fetch('/api/assets?tenant='+currentTenantId);
+  if (r.ok) {
+    const data = await r.json();
+    allAssets = data.assets || [];
+    updateCards();
+    updateCharts();
+    updateDashWidgets();
+    buildOsFilter();
+    loadTagFilter();
+    if (document.getElementById('page-assets').style.display   !== 'none') renderTable();
+    if (document.getElementById('page-os-eol').style.display   !== 'none') renderOsTable();
+    if (document.getElementById('page-app-eol').style.display  !== 'none') renderAppTable();
+    buildSwAssetMap();  // always rebuild asset id→name lookup
+    // If software page is open, reload inventory from server (tag-filtered)
+    if (document.getElementById('page-software').style.display !== 'none') loadSoftwareInventory();
+    updateSyncBadge(data.sync_state);
+    if (!allAssets.length) showDashEmpty();
+  } else {
+    showDashEmpty();
+  }
+}
+
+function updateSyncBadge(ss) {
+  const el = document.getElementById('last-refresh');
+  if (!ss || !ss.last_full_sync) {
+    el.textContent = 'No sync yet — click Sync';
+    return;
+  }
+  const dt = new Date(ss.last_full_sync * 1000).toLocaleString();
+  el.textContent = `Last sync: ${dt} (${ss.asset_count} assets)`;
+}
+
+// Start a full sync job
+async function startSync() {
+  if (!currentTenantId) { toast('Select a tenant first', 'error'); return; }
+  const r = await fetch('/api/jobs', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({tenant_id: currentTenantId})
+  });
+  if (!r.ok) { toast('Failed to start sync', 'error'); return; }
+  const init = await r.json();
+  setLoadingProgress(null, true, 'Full sync — fetching all assets…');
+  pollJob(init.job_id);
+}
+
+let _pollTimer = null;
+const STATUS_LABELS = {
+  starting:   'Starting…',
+  fetching:   'Fetching assets from Tenable VM…',
+  warming:    'Loading EOL reference data…',
+  processing: 'Processing assets…',
+  saving:     'Saving to local database…',
+  done:       'Done',
+  error:      'Error',
+};
+const INDETERMINATE_STATUSES = new Set(['starting','fetching','warming','saving']);
+
+async function pollJob(jobId) {
+  if (_pollTimer) clearTimeout(_pollTimer);
+  try {
+    const r = await fetch('/api/jobs/'+jobId);
+    if (!r.ok) { setSyncDone(); toast('Job error', 'error'); return; }
+    const job = await r.json();
+
+    if (job.status === 'done') {
+      setSyncDone();
+      await loadFromDB();
+      const newStr  = job.new     ? ` (+${job.new} new)`      : '';
+      const updStr  = job.updated ? ` (~${job.updated} updated)` : '';
+      toast(`Sync complete — ${job.total_in_db} assets in DB${newStr}${updStr}`, 'success');
+      return;
+    }
+    if (job.status === 'error') {
+      setSyncDone();
+      toast('Sync failed: '+(job.error||'unknown error'), 'error');
+      return;
+    }
+
+    const indet  = INDETERMINATE_STATUSES.has(job.status);
+    const pct    = (!indet && job.total > 0) ? Math.round((job.progress / job.total) * 100) : null;
+    const phase  = job.phase || STATUS_LABELS[job.status] || job.status;
+    const detail = (!indet && job.total > 0) ? ` (${job.progress} / ${job.total})` : '';
+    setLoadingProgress(pct, indet, phase + detail);
+
+    _pollTimer = setTimeout(() => pollJob(jobId), 1200);
+  } catch(e) {
+    _pollTimer = setTimeout(() => pollJob(jobId), 2000);
+  }
+}
+
+function setSyncDone() {
+  document.getElementById('progress-bar-wrap').style.display = 'none';
+  document.getElementById('dash-loading').style.display = 'none';
+  document.getElementById('full-sync-btn').disabled = false;
+}
+
+function setLoading(on) {
+  document.getElementById('dash-loading').style.display = on ? '' : 'none';
+  document.getElementById('dash-empty').style.display = (!on && !currentTenantId) ? '' : 'none';
+  const btns = ['refresh-btn','full-sync-btn'];
+  btns.forEach(id => { const el=document.getElementById(id); if(el) el.disabled = on; });
+  if (!on) document.getElementById('progress-bar-wrap').style.display = 'none';
+  if (on) {
+    document.getElementById('assets-loading').style.display = '';
+    document.getElementById('assets-table').style.display = 'none';
+    document.getElementById('assets-empty').style.display = 'none';
+  }
+}
+
+function setLoadingProgress(pct, indeterminate, msg) {
+  document.getElementById('dash-loading').style.display = '';
+  document.getElementById('dash-empty').style.display = 'none';
+  ['refresh-btn','full-sync-btn'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=true;});
+  document.getElementById('assets-loading').style.display = '';
+  document.getElementById('assets-table').style.display = 'none';
+  document.getElementById('assets-empty').style.display = 'none';
+
+  // Update spinner text
+  const loadMsg = document.getElementById('dash-loading-msg');
+  if (loadMsg) loadMsg.textContent = msg || 'Working…';
+
+  const wrap = document.getElementById('progress-bar-wrap');
+  wrap.style.display = '';
+  document.getElementById('progress-msg').textContent = '';
+  const bar = document.getElementById('progress-bar');
+
+  if (indeterminate) {
+    bar.classList.add('indeterminate');
+    bar.style.width = '100%';
+    bar.textContent = '';
+  } else {
+    bar.classList.remove('indeterminate');
+    bar.style.width = (pct||0)+'%';
+    bar.textContent = pct > 8 ? pct+'%' : '';
+  }
+}
+
+function showDashEmpty() {
+  document.getElementById('dash-empty').style.display = '';
+  document.getElementById('dash-loading').style.display = 'none';
+}
+
+// ── Dashboard drill-down ───────────────────────────────
+// Navigate to Asset Inventory, pre-setting OS status + tag filter to match the clicked card.
+// The Asset Inventory "status filter" maps to overall_status; we need to filter by OS status.
+// We pass a special "os_status" via the os-status-filter on the OS EOL page — but the
+// Asset Inventory page uses status-filter (overall_status).  The cleanest approach: set the
+// OS EOL page's status filter and tag filter and navigate there, since it's an OS-scoped view.
+function drillToAssets(status) {
+  // Copy tag selection from dashboard to OS EOL page filter
+  const dashTag = document.getElementById('dash-tag-filter').value;
+  document.getElementById('os-tag-filter').value  = dashTag;
+  document.getElementById('os-status-filter').value = status;
+  showPage('os-eol');
+  renderOsTable();
+}
+
+// ── Summary cards ──────────────────────────────────────
+function resetCards() {
+  ['eol','soon','supported','unknown','total'].forEach(k => {
+    const el = document.getElementById('cnt-'+k);
+    if (el) el.textContent = '—';
+  });
+}
+
+function dashTaggedAssets() {
+  const tf = document.getElementById('dash-tag-filter')?.value || '';
+  if (!tf) return allAssets;
+  const [tCat, tVal] = tf.split(':');
+  return allAssets.filter(a =>
+    (a.tags||[]).some(t => (t.category||t.key||'') === tCat && (t.value||'') === tVal)
+  );
+}
+
+function updateCards() {
+  // Dashboard is OS-only: count each asset by its OS EOL status, scoped to tag filter
+  const base = dashTaggedAssets();
+  const counts = {eol:0, eol_soon:0, supported:0, unknown:0};
+  base.forEach(a => {
+    const s = assetOsEntry(a)?.status || 'unknown';
+    counts[s] = (counts[s]||0) + 1;
+  });
+  document.getElementById('cnt-eol').textContent       = counts.eol;
+  document.getElementById('cnt-soon').textContent      = counts.eol_soon;
+  document.getElementById('cnt-supported').textContent = counts.supported;
+  document.getElementById('cnt-unknown').textContent   = counts.unknown;
+  document.getElementById('cnt-total').textContent     = base.length;
+  const sel = document.getElementById('tenant-select');
+  document.getElementById('cnt-tenant-info').textContent = sel.options[sel.selectedIndex]?.text || '';
+}
+
+// ── Charts ─────────────────────────────────────────────
+function updateCharts() {
+  // Charts are OS-only, scoped to the same tag filter as the cards
+  const base = dashTaggedAssets();
+  const counts = {eol:0, eol_soon:0, supported:0, unknown:0};
+  base.forEach(a => {
+    const s = assetOsEntry(a)?.status || 'unknown';
+    counts[s] = (counts[s]||0) + 1;
+  });
+
+  const colors = {eol:'#d62828', eol_soon:'#e85d04', supported:'#2dc653', unknown:'#9ca3af'};
+  const labels = ['End of Life','EOL Soon','Supported','Unknown'];
+  const vals   = [counts.eol, counts.eol_soon, counts.supported, counts.unknown];
+  const bgColors = [colors.eol, colors.eol_soon, colors.supported, colors.unknown];
+
+  if (donutChart) donutChart.destroy();
+  donutChart = new Chart(document.getElementById('donut-chart'), {
+    type: 'doughnut',
+    data: { labels, datasets: [{ data: vals, backgroundColor: bgColors, borderWidth: 2, borderColor: '#fff' }] },
+    options: { responsive: true, maintainAspectRatio: false, cutout: '65%',
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 10 } } } }
+  });
+
+  if (barChart) barChart.destroy();
+  barChart = new Chart(document.getElementById('bar-chart'), {
+    type: 'bar',
+    data: { labels, datasets: [{ label: 'Assets', data: vals, backgroundColor: bgColors, borderRadius: 6 }] },
+    options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      plugins: { legend: { display: false } },
+      scales: { x: { grid: { display: false } }, y: { grid: { display: false } } } }
+  });
+}
+
+// ── Dashboard widgets ──────────────────────────────────
+function updateDashWidgets() {
+  const base = dashTaggedAssets();
+  renderUpcomingEols(base);
+  renderTopEolOses(base);
+  populateTagCategorySelector(base);
+  renderEolByTag();
+}
+
+function renderUpcomingEols(base) {
+  const el = document.getElementById('upcoming-eols-body');
+  if (!el) return;
+
+  // Group assets by OS product+cycle where days_remaining ≤ 180
+  const groups = new Map();
+  base.forEach(a => {
+    const e = assetOsEntry(a);
+    if (!e || e.days_remaining == null || e.days_remaining > 180) return;
+    const key = (e.product||'') + '||' + (e.cycle||'');
+    if (!groups.has(key)) {
+      groups.set(key, {
+        label: [e.product, e.cycle].filter(Boolean).join(' ') || 'Unknown OS',
+        eol_date: e.eol_date,
+        days_remaining: e.days_remaining,
+        status: e.status,
+        count: 0
+      });
+    }
+    groups.get(key).count++;
+  });
+
+  const rows = [...groups.values()].sort((a,b) => a.days_remaining - b.days_remaining);
+
+  if (!rows.length) {
+    el.innerHTML = '<div style="text-align:center;padding:36px 20px;color:var(--gray-400);font-size:13px">No OS versions expiring within 180 days</div>';
+    return;
+  }
+
+  const thStyle = 'padding:7px 12px;font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;color:var(--gray-500);border-bottom:1px solid var(--border);white-space:nowrap';
+  let html = `<table style="width:100%;border-collapse:collapse;font-size:12.5px">
+    <thead><tr style="background:var(--gray-50)">
+      <th style="${thStyle};text-align:left">OS Version</th>
+      <th style="${thStyle};text-align:center">EOL Date</th>
+      <th style="${thStyle};text-align:center">Countdown</th>
+      <th style="${thStyle};text-align:right">Assets</th>
+    </tr></thead><tbody>`;
+
+  rows.forEach((r, i) => {
+    const urgent  = r.days_remaining <= 30;
+    const warning = r.days_remaining <= 90;
+    const color   = urgent ? 'var(--red)' : warning ? 'var(--orange)' : 'var(--gray-600)';
+    const countdown = r.days_remaining <= 0   ? 'Expired'
+                    : r.days_remaining === 1   ? '1 day'
+                    : r.days_remaining < 30    ? `${r.days_remaining}d`
+                    : r.days_remaining < 365   ? `${Math.round(r.days_remaining/30)}mo`
+                    : `${(r.days_remaining/365).toFixed(1)}yr`;
+    const border = i < rows.length-1 ? 'border-bottom:1px solid var(--gray-100)' : '';
+    html += `<tr style="${border}">
+      <td style="padding:8px 12px;font-weight:500;color:var(--gray-800)">${esc(r.label)}</td>
+      <td style="padding:8px 12px;text-align:center;color:var(--gray-500)">${r.eol_date||'—'}</td>
+      <td style="padding:8px 12px;text-align:center;font-weight:700;color:${color}">${countdown}</td>
+      <td style="padding:8px 12px;text-align:right">
+        <span style="background:var(--gray-100);border-radius:12px;padding:2px 9px;font-size:12px;font-weight:600;color:var(--gray-700)">${r.count}</span>
+      </td>
+    </tr>`;
+  });
+
+  el.innerHTML = html + '</tbody></table>';
+}
+
+function renderTopEolOses(base) {
+  const el = document.getElementById('top-eol-oses-body');
+  if (!el) return;
+
+  // Count EOL + EOL-soon assets grouped by OS version
+  const groups = new Map();
+  base.forEach(a => {
+    const e = assetOsEntry(a);
+    if (!e || !['eol','eol_soon'].includes(e.status)) return;
+    const key = [e.product, e.cycle].filter(Boolean).join(' ') || 'Unknown OS';
+    if (!groups.has(key)) groups.set(key, {label: key, eol: 0, eol_soon: 0});
+    if (e.status === 'eol') groups.get(key).eol++;
+    else groups.get(key).eol_soon++;
+  });
+
+  const rows = [...groups.values()]
+    .sort((a,b) => (b.eol + b.eol_soon) - (a.eol + a.eol_soon))
+    .slice(0, 10);
+
+  if (!rows.length) {
+    el.innerHTML = '<div style="text-align:center;padding:36px 20px;color:var(--gray-400);font-size:13px">No EOL or EOL Soon OS versions found</div>';
+    return;
+  }
+
+  const maxCount = rows[0].eol + rows[0].eol_soon;
+  let html = '';
+  rows.forEach((r, i) => {
+    const total  = r.eol + r.eol_soon;
+    const barPct = Math.round((total / maxCount) * 100);
+    const eolPct = Math.round((r.eol / total) * 100);
+    const border = i < rows.length-1 ? 'border-bottom:1px solid var(--gray-100)' : '';
+    html += `<div style="padding:9px 12px;${border}">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:5px">
+        <span style="font-size:12.5px;font-weight:500;color:var(--gray-800)">${esc(r.label)}</span>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          ${r.eol      ? `<span style="font-size:11px;font-weight:700;color:var(--red)">${r.eol} EOL</span>` : ''}
+          ${r.eol_soon ? `<span style="font-size:11px;font-weight:700;color:var(--orange)">${r.eol_soon} Soon</span>` : ''}
+        </div>
+      </div>
+      <div style="height:5px;background:var(--gray-100);border-radius:3px;overflow:hidden">
+        <div style="height:100%;width:${barPct}%;display:flex;border-radius:3px;overflow:hidden">
+          <div style="width:${eolPct}%;background:var(--red)"></div>
+          <div style="flex:1;background:var(--orange)"></div>
+        </div>
+      </div>
+    </div>`;
+  });
+
+  el.innerHTML = html;
+}
+
+function populateTagCategorySelector(base) {
+  const sel = document.getElementById('tag-breakdown-cat');
+  if (!sel) return;
+  const cats = new Set();
+  base.forEach(a => (a.tags||[]).forEach(t => { const c = t.category||t.key||''; if(c) cats.add(c); }));
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">— select category —</option>';
+  [...cats].sort().forEach(c => {
+    const o = document.createElement('option');
+    o.value = c; o.textContent = c; sel.appendChild(o);
+  });
+  if (prev && cats.has(prev)) sel.value = prev;
+  else if (cats.size) sel.value = [...cats].sort()[0];
+}
+
+function renderEolByTag() {
+  const base = dashTaggedAssets();
+  const cat  = document.getElementById('tag-breakdown-cat')?.value || '';
+  const wrap  = document.getElementById('eol-by-tag-chart-wrap');
+  const empty = document.getElementById('eol-by-tag-empty');
+  if (!wrap) return;
+
+  if (!cat) {
+    wrap.style.display = 'none';
+    if (empty) empty.style.display = '';
+    return;
+  }
+
+  // Count statuses per tag value for this category
+  const tagCounts = new Map();
+  base.forEach(a => {
+    const tv  = (a.tags||[]).find(t => (t.category||t.key||'') === cat);
+    const val = tv ? (tv.value||'(untagged)') : '(untagged)';
+    const s   = assetOsEntry(a)?.status || 'unknown';
+    if (!tagCounts.has(val)) tagCounts.set(val, {eol:0, eol_soon:0, supported:0, unknown:0});
+    tagCounts.get(val)[s] = (tagCounts.get(val)[s]||0) + 1;
+  });
+
+  // Sort tag values by total EOL assets descending
+  const labels = [...tagCounts.keys()].sort((a,b) => {
+    const ta = tagCounts.get(a), tb = tagCounts.get(b);
+    return (tb.eol + tb.eol_soon) - (ta.eol + ta.eol_soon);
+  });
+
+  // Resize chart height dynamically
+  wrap.style.height = Math.max(180, labels.length * 38) + 'px';
+  wrap.style.display = '';
+  if (empty) empty.style.display = 'none';
+
+  const datasets = [
+    {label:'End of Life', data: labels.map(l=>tagCounts.get(l).eol),      backgroundColor:'#D93025', borderRadius:3},
+    {label:'EOL Soon',    data: labels.map(l=>tagCounts.get(l).eol_soon),  backgroundColor:'#E8650A', borderRadius:3},
+    {label:'Supported',   data: labels.map(l=>tagCounts.get(l).supported), backgroundColor:'#1E8A44', borderRadius:3},
+    {label:'Unknown',     data: labels.map(l=>tagCounts.get(l).unknown),   backgroundColor:'#94A3B8', borderRadius:3},
+  ];
+
+  if (tagBarChart) tagBarChart.destroy();
+  tagBarChart = new Chart(document.getElementById('tag-bar-chart'), {
+    type: 'bar',
+    data: {labels, datasets},
+    options: {
+      responsive: true, maintainAspectRatio: false, indexAxis: 'y',
+      scales: {
+        x: {stacked: true, grid:{display:false}},
+        y: {stacked: true, grid:{display:false}, ticks:{font:{size:11}}}
+      },
+      plugins: {
+        legend: {position:'bottom', labels:{font:{size:11}, padding:14, boxWidth:12}},
+        tooltip: {
+          callbacks: {
+            label: ctx => ` ${ctx.dataset.label}: ${ctx.raw}`
+          }
+        }
+      }
+    }
+  });
+}
+
+// ── Tag filter ─────────────────────────────────────────
+async function loadTagFilter() {
+  if (!currentTenantId) return;
+  try {
+    const r = await fetch('/api/tags?tenant='+currentTenantId);
+    if (!r.ok) return;
+    const tags = await r.json();
+
+    // Group by category
+    const byCategory = {};
+    tags.forEach(t => {
+      if (!byCategory[t.category]) byCategory[t.category] = [];
+      byCategory[t.category].push(t.value);
+    });
+
+    const hasTags = tags.length > 0;
+
+    // Build the inner option HTML (same for all dropdowns)
+    function buildTagOptions(selEl) {
+      const prev = selEl.value;
+      selEl.innerHTML = '<option value="">All tags</option>';
+      Object.keys(byCategory).sort().forEach(cat => {
+        const grp = document.createElement('optgroup');
+        grp.label = cat;
+        byCategory[cat].sort().forEach(val => {
+          const o = document.createElement('option');
+          o.value = `${cat}:${val}`;
+          o.textContent = val;
+          grp.appendChild(o);
+        });
+        selEl.appendChild(grp);
+      });
+      if (prev) selEl.value = prev;
+      selEl.style.display = hasTags ? '' : 'none';
+    }
+
+    buildTagOptions(document.getElementById('dash-tag-filter'));
+    buildTagOptions(document.getElementById('tag-filter'));
+    buildTagOptions(document.getElementById('os-tag-filter'));
+    buildTagOptions(document.getElementById('app-tag-filter'));
+    buildTagOptions(document.getElementById('sw-tag-filter'));
+  } catch(e) { /* tags not critical */ }
+}
+
+// ── Table ──────────────────────────────────────────────
+function buildOsFilter() {
+  const families = new Set();
+  allAssets.forEach(a => {
+    if (a.os) {
+      const s = a.os.toLowerCase();
+      if (s.includes('windows')) families.add('Windows');
+      else if (s.includes('red hat') || s.includes('rhel') || s.includes('centos') || s.includes('alma') || s.includes('rocky')) families.add('RHEL/CentOS');
+      else if (s.includes('ubuntu')) families.add('Ubuntu');
+      else if (s.includes('debian')) families.add('Debian');
+      else if (s.includes('suse')) families.add('SUSE');
+      else if (s.includes('amazon')) families.add('Amazon Linux');
+      else if (s.includes('mac') || s.includes('darwin')) families.add('macOS');
+      else if (s.includes('oracle')) families.add('Oracle Linux');
+      else families.add('Other');
+    }
+  });
+  const sel = document.getElementById('os-filter');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="">All OS families</option>';
+  [...families].sort().forEach(f => { const o = document.createElement('option'); o.value=f; o.textContent=f; sel.appendChild(o); });
+  if (prev) sel.value = prev;
+}
+
+function sortTable(field) {
+  if (sortField === field) sortDir *= -1; else { sortField = field; sortDir = 1; }
+  document.querySelectorAll('#assets-table .sort-icon').forEach(el => el.textContent='↕');
+  const icon = document.getElementById('sort-'+field);
+  if (icon) icon.textContent = sortDir === 1 ? '↑' : '↓';
+  renderTable();
+}
+
+function assetOsEntry(a) {
+  return (a.eol_entries||[]).find(e => e.type === 'Operating System' || e.source === 'os');
+}
+
+function assetAppWorst(a) {
+  const appEntries = (a.eol_entries||[]).filter(e => e.type === 'Application');
+  const pri = {eol:0,eol_soon:1,supported:2,unknown:3};
+  return appEntries.reduce((best,e) => !best||(pri[e.status]??3)<(pri[best.status]??3)?e:best, null);
+}
+
+// Derive overall status from eol_entries — matches backend _recompute_overall_status / RISK_PRI.
+// Priority: eol(0) > eol_soon(1) > supported(2) > unknown(3)
+// "supported" beats "unknown" — an asset with a known-good OS + unassessable apps = Supported,
+// not Unknown. "unknown" only wins when nothing at all could be assessed.
+function assetOverallStatus(a) {
+  const entries = a.eol_entries || [];
+  if (!entries.length) return 'unknown';
+  const RISK_PRI = {eol:0, eol_soon:1, supported:2, unknown:3};
+  return entries.reduce((worst, e) => {
+    return (RISK_PRI[e.status] ?? 3) < (RISK_PRI[worst] ?? 3) ? e.status : worst;
+  }, 'unknown');
+}
+
+function getAssetSortVal(a, field) {
+  const statusOrder = {eol:0, eol_soon:1, supported:2, unknown:3};
+  if (field === 'overall_status') return statusOrder[assetOverallStatus(a)] ?? 3;
+  if (field === 'os_status')   { const e=assetOsEntry(a); return statusOrder[e?.status??'unknown']??3; }
+  if (field === 'os_eol_date') { const e=assetOsEntry(a); return e?.eol_date||'9999-99-99'; }
+  if (field === 'os_days')     { const e=assetOsEntry(a); return e?.days_remaining??99999; }
+  if (field === 'app_status')  { const e=assetAppWorst(a); return statusOrder[e?.status??'unknown']??3; }
+  return (a[field] || '').toString().toLowerCase();
+}
+
+function renderTable() {
+  const search = document.getElementById('search-input').value.toLowerCase();
+  const statusFilter = document.getElementById('status-filter').value;
+  const osFilter = document.getElementById('os-filter').value;
+  const tagFilter = document.getElementById('tag-filter').value;
+
+  filteredAssets = allAssets.filter(a => {
+    if (statusFilter && assetOverallStatus(a) !== statusFilter) return false;
+    if (osFilter) {
+      const s = (a.os || '').toLowerCase();
+      const familyMap = {
+        'Windows': 'windows', 'RHEL/CentOS': ['red hat','rhel','centos','alma','rocky'],
+        'Ubuntu': 'ubuntu', 'Debian': 'debian', 'SUSE': 'suse',
+        'Amazon Linux': 'amazon', 'macOS': ['mac','darwin'], 'Oracle Linux': 'oracle',
+      };
+      const patterns = familyMap[osFilter];
+      if (patterns) {
+        const arr = Array.isArray(patterns) ? patterns : [patterns];
+        if (!arr.some(p => s.includes(p))) return false;
+      }
+    }
+    if (tagFilter) {
+      const [cat, val] = tagFilter.split(':');
+      const tags = a.tags || (a.attributes && a.attributes.tags) || [];
+      if (!tags.some(t => (t.category||t.key||'') === cat && (t.value||'') === val)) return false;
+    }
+    if (search) {
+      const hay = [a.name, a.os, ...(a.ips||[]), ...(a.hostnames||[])].join(' ').toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+
+  filteredAssets.sort((a, b) => {
+    const av = getAssetSortVal(a, sortField), bv = getAssetSortVal(b, sortField);
+    if (av < bv) return -sortDir; if (av > bv) return sortDir; return 0;
+  });
+
+  assetsPage = 0;  // reset on filter/sort change
+  _renderAssetsPage();
+}
+
+function _renderAssetsPage() {
+  const search = document.getElementById('search-input').value.toLowerCase();
+  const tbody   = document.getElementById('assets-tbody');
+  const table   = document.getElementById('assets-table');
+  const empty   = document.getElementById('assets-empty');
+  const loading = document.getElementById('assets-loading');
+  loading.style.display = 'none';
+  tbody.innerHTML = '';
+
+  if (!filteredAssets.length) {
+    if (!allAssets.length) { empty.style.display = ''; table.style.display = 'none'; return; }
+    table.style.display = ''; empty.style.display = 'none';
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align:center;padding:30px;color:var(--gray-400)">No assets match filters</td></tr>`;
+    return;
+  }
+  table.style.display = ''; empty.style.display = 'none';
+
+  const slice = search ? filteredAssets
+    : filteredAssets.slice(assetsPage * PAGE_SIZE, (assetsPage + 1) * PAGE_SIZE);
+
+  document.getElementById('filter-count').textContent =
+    search ? `${filteredAssets.length} of ${allAssets.length} assets`
+           : `${filteredAssets.length} of ${allAssets.length} assets`;
+
+  slice.forEach(a => {
+    const osE      = assetOsEntry(a);
+    const appWorst = assetAppWorst(a);
+    const osStatus  = osE?.status  || 'unknown';
+    const appStatus = appWorst?.status || 'unknown';
+    const lastSeen  = a.last_seen ? new Date(a.last_seen).toLocaleDateString() : '—';
+
+    const appIssues = (a.eol_entries||[]).filter(e => e.type==='Application' && e.status !== 'unknown' && e.status !== 'supported');
+    const appCell = appStatus === 'unknown' && !appWorst
+      ? '<span style="color:var(--gray-400);font-size:12px">—</span>'
+      : `<span class="badge ${appStatus}"><span class="dot ${appStatus}"></span>${statusLabel(appStatus)}</span>
+         ${appIssues.length ? `<span style="font-size:11px;color:var(--gray-400);margin-left:4px">${appIssues.length} item${appIssues.length!==1?'s':''}</span>` : ''}`;
+
+    const tr = document.createElement('tr');
+    tr.style.cursor = 'pointer';
+    tr.title = 'Click to view asset details';
+    tr.onclick = () => openAssetModal(a.id);
+    tr.innerHTML = `
+      <td>
+        <div style="font-weight:500">${esc(a.name)}</div>
+        <div style="font-size:11px;color:var(--gray-400)">${(a.ips||[]).slice(0,2).join(', ')}</div>
+      </td>
+      <td style="max-width:180px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" title="${esc(a.os||'')}">
+        ${esc(a.os||'—')}
+      </td>
+      <td><span class="badge ${osStatus}"><span class="dot ${osStatus}"></span>${statusLabel(osStatus)}</span></td>
+      <td>${esc(osE?.eol_date||'—')}</td>
+      <td>${daysStr(osE?.days_remaining??null)}</td>
+      <td>${appCell}</td>
+      <td style="color:var(--gray-400)">${lastSeen}</td>
+      <td>
+        <button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openAssetModal('${a.id}')">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+          Drill Down
+        </button>
+      </td>`;
+    tbody.appendChild(tr);
+  });
+
+  if (!search) appendPaginationRow(tbody, assetsPage, filteredAssets.length, assetsGotoPage, 8);
+}
+
+function assetsGotoPage(page) {
+  assetsPage = page;
+  _renderAssetsPage();
+  document.getElementById('assets-table')?.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+// ── CSV Export ─────────────────────────────────────────
+function exportCSV() {
+  if (!filteredAssets.length) { toast('No assets to export', 'error'); return; }
+  const rows = [['Hostname','IPs','Operating System','OS EOL Status','OS EOL Date','OS Days Remaining','App EOL Status','Last Seen']];
+  filteredAssets.forEach(a => {
+    const osE      = assetOsEntry(a);
+    const appWorst = assetAppWorst(a);
+    rows.push([
+      a.name, (a.ips||[]).join(';'), a.os||'',
+      osE?.status||'', osE?.eol_date||'', osE?.days_remaining??'',
+      appWorst?.status||'', a.last_seen||''
+    ]);
+  });
+  downloadCSV(rows, 'asset-eol');
+}
+
+// ── OS EOL view ────────────────────────────────────────
+let osRows = [], osSort = {field:'days_remaining', dir:1};
+
+function buildOsRows(assets) {
+  return (assets || allAssets).map(a => {
+    const e = (a.eol_entries||[]).find(x => x.type === 'Operating System' || x.source === 'os');
+    return {
+      asset:          a,
+      status:         e?.status         || 'unknown',
+      eol_date:       e?.eol_date       || null,
+      days_remaining: e?.days_remaining ?? null,
+    };
+  });
+}
+
+function sortOsTable(field) {
+  osSort.dir = osSort.field === field ? -osSort.dir : 1;
+  osSort.field = field;
+  osPage = 0;
+  document.querySelectorAll('[id^="os-sort-"]').forEach(el => el.textContent='↕');
+  const el = document.getElementById('os-sort-'+field);
+  if (el) el.textContent = osSort.dir===1?'↑':'↓';
+  renderOsTable();
+}
+
+function renderOsTable() {
+  const search    = document.getElementById('os-search').value.toLowerCase();
+  const sf        = document.getElementById('os-status-filter').value;
+  const tagFilter = document.getElementById('os-tag-filter').value;
+
+  let baseAssets = allAssets;
+  if (tagFilter) {
+    const [tCat, tVal] = tagFilter.split(':');
+    baseAssets = allAssets.filter(a =>
+      (a.tags||[]).some(t => (t.category||t.key||'') === tCat && (t.value||'') === tVal)
+    );
+  }
+
+  let rows = buildOsRows(baseAssets).filter(r => {
+    if (sf && r.status !== sf) return false;
+    if (search) {
+      const hay = [r.asset.name, r.asset.os, ...(r.asset.ips||[])].join(' ').toLowerCase();
+      if (!hay.includes(search)) return false;
+    }
+    return true;
+  });
+
+  const {field, dir} = osSort;
+  rows.sort((a, b) => {
+    let av, bv;
+    if (field === 'days_remaining') { av = a.days_remaining??99999; bv = b.days_remaining??99999; }
+    else if (field === 'status')    { const o={eol:0,eol_soon:1,unknown:2,supported:3}; av=o[a.status]??2; bv=o[b.status]??2; }
+    else if (field === 'eol_date')  { av = a.eol_date||'9999'; bv = b.eol_date||'9999'; }
+    else if (field === 'last_seen') { av = a.asset.last_seen||''; bv = b.asset.last_seen||''; }
+    else if (field === 'os')        { av = (a.asset.os||'').toLowerCase(); bv = (b.asset.os||'').toLowerCase(); }
+    else                            { av = (a.asset.name||'').toLowerCase(); bv = (b.asset.name||'').toLowerCase(); }
+    if (av < bv) return -dir; if (av > bv) return dir; return 0;
+  });
+  osRows = rows;
+
+  const counts = {eol:0,eol_soon:0,supported:0,unknown:0};
+  buildOsRows(baseAssets).forEach(r => counts[r.status]=(counts[r.status]||0)+1);
+  document.getElementById('os-summary-cards').innerHTML = miniCards(counts, baseAssets.length);
+  document.getElementById('os-filter-count').textContent =
+    `${rows.length} of ${baseAssets.length} assets`;
+
+  osPage = 0;  // reset on filter/sort change
+  _renderOsPage();
+}
+
+function _renderOsPage() {
+  const search = document.getElementById('os-search').value.toLowerCase();
+  const tbody  = document.getElementById('os-tbody');
+  const tbl    = document.getElementById('os-table');
+  const empty  = document.getElementById('os-empty');
+  tbody.innerHTML = '';
+
+  if (!allAssets.length) { tbl.style.display='none'; empty.style.display=''; return; }
+  tbl.style.display=''; empty.style.display='none';
+
+  if (!osRows.length) {
+    tbody.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--gray-400)">No assets match filters</td></tr>`;
+    return;
+  }
+
+  const slice = search ? osRows : osRows.slice(osPage * PAGE_SIZE, (osPage + 1) * PAGE_SIZE);
+
+  slice.forEach(r => {
+    const a  = r.asset;
+    const tr = document.createElement('tr');
+    tr.style.cursor='pointer'; tr.onclick=()=>openAssetModal(a.id);
+    tr.innerHTML = `
+      <td><div style="font-weight:500">${esc(a.name)}</div>
+        <div style="font-size:11px;color:var(--gray-400)">${(a.ips||[]).slice(0,2).join(', ')}</div></td>
+      <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(a.os||'')}">${esc(a.os||'—')}</td>
+      <td><span class="badge ${r.status}"><span class="dot ${r.status}"></span>${statusLabel(r.status)}</span></td>
+      <td>${esc(r.eol_date||'—')}</td>
+      <td>${daysStr(r.days_remaining)}</td>
+      <td style="color:var(--gray-400)">${a.last_seen?new Date(a.last_seen).toLocaleDateString():'—'}</td>
+      <td><button class="btn btn-outline btn-sm" onclick="event.stopPropagation();openAssetModal('${a.id}')">Details</button></td>`;
+    tbody.appendChild(tr);
+  });
+
+  if (!search) appendPaginationRow(tbody, osPage, osRows.length, osGotoPage, 7);
+}
+
+function osGotoPage(page) {
+  osPage = page;
+  _renderOsPage();
+  document.getElementById('os-table')?.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function exportOsCSV() {
+  if (!osRows.length) { toast('No data to export','error'); return; }
+  const rows = [['Asset','IPs','Operating System','Status','EOL Date','Days Remaining','Last Seen']];
+  osRows.forEach(r => rows.push([r.asset.name,(r.asset.ips||[]).join(';'),r.asset.os||'',
+    r.status,r.eol_date||'',r.days_remaining??'',r.asset.last_seen||'']));
+  downloadCSV(rows, 'os-eol');
+}
+
+// ── App EOL view ────────────────────────────────────────
+let appRows = [], appSort = {field:'days_remaining', dir:1};
+
+function buildAppRows(assets) {
+  const map = new Map();  // key -> row
+  (assets || allAssets).forEach(asset => {
+    (asset.eol_entries||[]).forEach(e => {
+      if (e.type !== 'Application' && e.source !== 'cpe') return;
+      const key = `${e.product||''}||${e.version||''}`;
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          name:           e.name    || e.product || '—',
+          product:        e.product || '—',
+          version:        e.version || '—',
+          status:         e.status,
+          eol_date:       e.eol_date    || null,
+          days_remaining: e.days_remaining ?? null,
+          assets:         [],
+        });
+      }
+      const row = map.get(key);
+      if (!row.assets.find(x => x.id===asset.id)) {
+        row.assets.push({id:asset.id, name:asset.name, ips:asset.ips||[]});
+      }
+      // Upgrade status if this instance is worse
+      const pri = {eol:0,eol_soon:1,unknown:2,supported:3};
+      if ((pri[e.status]??2) < (pri[row.status]??2)) {
+        row.status=e.status; row.eol_date=e.eol_date; row.days_remaining=e.days_remaining;
+      }
+    });
+  });
+  return [...map.values()];
+}
+
+function sortAppTable(field) {
+  appSort.dir = appSort.field === field ? -appSort.dir : 1;
+  appSort.field = field;
+  appPage = 0;
+  document.querySelectorAll('[id^="app-sort-"]').forEach(el => el.textContent='↕');
+  const el = document.getElementById('app-sort-'+field);
+  if (el) el.textContent = appSort.dir===1?'↑':'↓';
+  renderAppTable();
+}
+
+function renderAppTable() {
+  const search    = document.getElementById('app-search').value.toLowerCase();
+  const sf        = document.getElementById('app-status-filter').value;
+  const tagFilter = document.getElementById('app-tag-filter').value;
+
+  let baseAssets = allAssets;
+  if (tagFilter) {
+    const [tCat, tVal] = tagFilter.split(':');
+    baseAssets = allAssets.filter(a =>
+      (a.tags||[]).some(t => (t.category||t.key||'') === tCat && (t.value||'') === tVal)
+    );
+  }
+
+  const all = buildAppRows(baseAssets);
+  let rows = all.filter(r => {
+    if (sf && r.status !== sf) return false;
+    if (search && !(r.name+' '+r.product+' '+r.version).toLowerCase().includes(search)) return false;
+    return true;
+  });
+
+  const {field, dir} = appSort;
+  rows.sort((a, b) => {
+    let av, bv;
+    if (field==='days_remaining')  { av=a.days_remaining??99999; bv=b.days_remaining??99999; }
+    else if (field==='status')     { const o={eol:0,eol_soon:1,unknown:2,supported:3}; av=o[a.status]??2; bv=o[b.status]??2; }
+    else if (field==='eol_date')   { av=a.eol_date||'9999'; bv=b.eol_date||'9999'; }
+    else if (field==='asset_count'){ av=a.assets.length; bv=b.assets.length; }
+    else if (field==='version')    { av=a.version; bv=b.version; }
+    else                           { av=(a.name||'').toLowerCase(); bv=(b.name||'').toLowerCase(); }
+    if (av<bv) return -dir; if (av>bv) return dir; return 0;
+  });
+  appRows = rows;
+
+  const counts = {eol:0,eol_soon:0,supported:0,unknown:0};
+  all.forEach(r => counts[r.status]=(counts[r.status]||0)+1);
+  document.getElementById('app-summary-cards').innerHTML = miniCards(counts, all.length, 'application');
+  document.getElementById('app-filter-count').textContent =
+    `${rows.length} of ${all.length} unique applications`;
+
+  appPage = 0;  // reset on filter/sort change
+  _renderAppPage();
+}
+
+function _renderAppPage() {
+  const search = document.getElementById('app-search').value.toLowerCase();
+  const tbody  = document.getElementById('app-tbody');
+  const tbl    = document.getElementById('app-table');
+  const empty  = document.getElementById('app-empty');
+  tbody.innerHTML = '';
+
+  if (!appRows.length && !document.getElementById('app-filter-count').textContent.startsWith('0')) {
+    tbl.style.display='none'; empty.style.display=''; return;
+  }
+  tbl.style.display=''; empty.style.display='none';
+
+  if (!appRows.length) {
+    tbody.innerHTML=`<tr><td colspan="7" style="text-align:center;padding:30px;color:var(--gray-400)">No applications match filters</td></tr>`;
+    return;
+  }
+
+  const slice = search ? appRows : appRows.slice(appPage * PAGE_SIZE, (appPage + 1) * PAGE_SIZE);
+
+  slice.forEach(r => {
+    // Use sanitized key as expand ID so it's stable across page changes
+    const expandId = 'app-exp-' + r.key.replace(/[^a-z0-9]/gi, '_').slice(0, 40);
+
+    const tr = document.createElement('tr');
+    const eolRef = r.eol_url
+      ? `<a href="${esc(r.eol_url)}" target="_blank" title="endoflife.date reference"
+           style="margin-left:6px;color:var(--accent);font-size:11px;text-decoration:none">↗</a>`
+      : '';
+    tr.innerHTML = `
+      <td style="font-weight:500">${esc(r.name)}${eolRef}</td>
+      <td><code style="font-size:12px;background:var(--gray-100);padding:2px 6px;border-radius:4px">${esc(r.version)}</code></td>
+      <td><span class="badge ${r.status}"><span class="dot ${r.status}"></span>${statusLabel(r.status)}</span></td>
+      <td>${esc(r.eol_date||'—')}</td>
+      <td>${daysStr(r.days_remaining)}</td>
+      <td>
+        <span style="font-weight:600">${r.assets.length}</span>
+        <span style="font-size:11px;color:var(--gray-400);margin-left:3px">asset${r.assets.length!==1?'s':''}</span>
+      </td>
+      <td><button class="btn btn-outline btn-sm" data-expand="${expandId}">▸ View Assets</button></td>`;
+
+    const btn = tr.querySelector('button[data-expand]');
+    btn.addEventListener('click', () => toggleAppExpand(expandId, btn));
+    tbody.appendChild(tr);
+
+    const expandTr = document.createElement('tr');
+    expandTr.id = expandId;
+    expandTr.style.display = 'none';
+    expandTr.className = 'expand-row';
+    const inner = document.createElement('td');
+    inner.colSpan = 7;
+    inner.style.cssText = 'padding:10px 16px 14px;background:#f8fbff';
+    inner.innerHTML = `<div style="font-size:11.5px;font-weight:600;color:var(--gray-400);margin-bottom:8px;text-transform:uppercase;letter-spacing:.3px">Affected Assets (${r.assets.length})</div>`;
+    const chipsWrap = document.createElement('div');
+    chipsWrap.style.cssText = 'display:flex;flex-wrap:wrap;gap:6px';
+    r.assets.forEach(asset => {
+      const chip = document.createElement('div');
+      chip.style.cssText = 'cursor:pointer;background:#fff;border:1px solid var(--border);border-radius:7px;padding:5px 11px;font-size:12.5px;display:inline-flex;align-items:center;gap:6px';
+      chip.innerHTML = `<span class="dot ${r.status}"></span><span style="font-weight:500">${esc(asset.name)}</span>${asset.ips[0]?`<span style="color:var(--gray-400);font-size:11px">${esc(asset.ips[0])}</span>`:''}`;
+      chip.addEventListener('click', () => openAssetModal(asset.id));
+      chipsWrap.appendChild(chip);
+    });
+    inner.appendChild(chipsWrap);
+    expandTr.appendChild(inner);
+    tbody.appendChild(expandTr);
+  });
+
+  if (!search) appendPaginationRow(tbody, appPage, appRows.length, appGotoPage, 7);
+}
+
+function appGotoPage(page) {
+  appPage = page;
+  _renderAppPage();
+  document.getElementById('app-table')?.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function toggleAppExpand(expandId, btn) {
+  const row = document.getElementById(expandId);
+  if (!row) return;
+  const collapsed = row.style.display === 'none';
+  row.style.display = collapsed ? '' : 'none';
+  if (btn) btn.textContent = collapsed ? '▾ Hide Assets' : '▸ View Assets';
+}
+
+function exportAppCSV() {
+  if (!appRows.length) { toast('No data to export','error'); return; }
+  const rows = [['Application','Version','Status','EOL Date','Days Remaining','Affected Asset Count','Affected Assets']];
+  appRows.forEach(r => rows.push([r.name, r.version, r.status, r.eol_date||'',
+    r.days_remaining??'', r.assets.length, r.assets.map(a=>a.name).join('; ')]));
+  downloadCSV(rows, 'app-eol');
+}
+
+// ── Software Inventory ─────────────────────────────────
+// Inventory is computed server-side and paginated client-side.
+// Expanded version content is rendered lazily on first click.
+
+const SW_STATUS_PRI = {eol:0, eol_soon:1, not_tracked:2, unknown:3, supported:4};
+const SW_PAGE_SIZE  = 50;
+
+let swInventory    = [];    // full list from API [{vendor,product,worst_status,versions,...}]
+let swFiltered     = [];    // after text+status filter
+let swPage         = 0;     // current page (0-indexed); ignored when text search is active
+let swExpanded     = new Set();
+let swRendered     = new Set();  // expand rows that have had their DOM built (lazy)
+let swAssetMap     = new Map();  // id → {name, ip}  — built from allAssets
+
+function buildSwAssetMap() {
+  swAssetMap.clear();
+  allAssets.forEach(a => swAssetMap.set(a.id, {name: a.name, ip: (a.ips||[])[0]||''}));
+}
+
+// Called when assets load (always) — just rebuild the lookup map; inventory reloads lazily
+function buildSoftwareInventoryData() {
+  buildSwAssetMap();
+  // If the software page is open, reload the inventory from the server
+  if (document.getElementById('page-software').style.display !== 'none') {
+    loadSoftwareInventory();
+  } else {
+    swInventory = [];  // stale; will reload when page is next shown
+  }
+}
+
+async function initSoftwarePage() {
+  buildSwAssetMap();
+  if (!swInventory.length || swInventory._tenant !== currentTenantId) {
+    await loadSoftwareInventory();
+  } else {
+    renderSoftwareInventory();
+  }
+}
+
+async function loadSoftwareInventory() {
+  if (!currentTenantId) return;
+  const tag = document.getElementById('sw-tag-filter').value;
+  const url = `/api/software/inventory?tenant=${currentTenantId}${tag?'&tag='+encodeURIComponent(tag):''}`;
+
+  document.getElementById('sw-table').style.display = 'none';
+  document.getElementById('sw-empty').style.display = 'none';
+  document.getElementById('sw-filter-count').textContent = 'Loading…';
+
+  try {
+    const r    = await fetch(url);
+    const data = await r.json();
+    swInventory = data.products || [];
+    swInventory._tenant = currentTenantId;  // tag for staleness check
+    swExpanded.clear();
+    swRendered.clear();
+    renderSoftwareInventory();
+  } catch(e) {
+    document.getElementById('sw-filter-count').textContent = 'Failed to load';
+    toast('Failed to load software inventory', 'error');
+  }
+}
+
+function renderSoftwareInventory() {
+  const search = document.getElementById('sw-query').value.toLowerCase();
+  const sf     = document.getElementById('sw-status-filter').value;
+
+  swFiltered = swInventory;
+  if (search) swFiltered = swFiltered.filter(p => p.product.includes(search) || p.vendor.includes(search));
+  if (sf)     swFiltered = swFiltered.filter(p => p.versions.some(v => v.eol_status === sf));
+
+  // Reset to page 0 when filters change; keep page on tag/status-only changes
+  if (search) swPage = 0;  // search shows all — page irrelevant, but reset anyway
+
+  const tbody  = document.getElementById('sw-tbody');
+  const tbl    = document.getElementById('sw-table');
+  const empty  = document.getElementById('sw-empty');
+  const fcount = document.getElementById('sw-filter-count');
+
+  tbody.innerHTML = '';
+
+  if (!swInventory.length) {
+    tbl.style.display = 'none'; empty.style.display = ''; fcount.textContent = ''; return;
+  }
+  if (!swFiltered.length) {
+    tbl.style.display = ''; empty.style.display = 'none';
+    fcount.textContent = `0 of ${swInventory.length} products`;
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center;padding:30px;color:var(--gray-400)">No products match filters</td></tr>`;
+    return;
+  }
+
+  tbl.style.display = ''; empty.style.display = 'none';
+
+  if (search) {
+    // Search active — show all matches, no pagination
+    fcount.textContent = `${swFiltered.length} of ${swInventory.length} products`;
+    swRenderRows(0, swFiltered.length);
+  } else {
+    // Paginated view
+    const totalPages = Math.ceil(swFiltered.length / SW_PAGE_SIZE);
+    swPage = Math.max(0, Math.min(swPage, totalPages - 1));
+    const start = swPage * SW_PAGE_SIZE;
+    const end   = Math.min(start + SW_PAGE_SIZE, swFiltered.length);
+    fcount.textContent = `${swFiltered.length} of ${swInventory.length} products`;
+    swRenderRows(start, end);
+    swRenderPagination(totalPages);
+  }
+}
+
+function swRenderRows(start, end) {
+  const tbody  = document.getElementById('sw-tbody');
+  const sf     = document.getElementById('sw-status-filter').value;
+  const frag   = document.createDocumentFragment();
+
+  for (let pi = start; pi < end; pi++) {
+    const p    = swFiltered[pi];
+    const pkey = `${p.vendor}:${p.product}`;
+    const isOpen = swExpanded.has(pkey);
+
+    // ── Product header row ──
+    const htr = document.createElement('tr');
+    htr.style.cursor = 'pointer';
+    htr.dataset.pkey = pkey;
+    htr.innerHTML = `
+      <td style="font-weight:600">
+        <span class="sw-icon" style="font-size:11px;margin-right:5px;color:var(--gray-400)">${isOpen?'▾':'▸'}</span>
+        ${esc(p.product.replace(/_/g,' '))}
+        <span style="font-size:11px;color:var(--gray-400);font-weight:400;margin-left:6px">${esc(p.vendor)}</span>
+      </td>
+      <td style="color:var(--gray-500)">${p.version_count}</td>
+      <td style="color:var(--gray-500)">${p.total_assets}</td>
+      <td><span class="badge ${p.worst_status}"><span class="dot ${p.worst_status}"></span>${statusLabel(p.worst_status)}</span></td>
+      <td></td>`;
+    htr.addEventListener('click', () => swToggle(htr, p, sf));
+    frag.appendChild(htr);
+
+    // ── Expand row — empty placeholder; filled lazily on first open ──
+    const etr = document.createElement('tr');
+    etr.className     = 'expand-row';
+    etr.dataset.pkey  = pkey;
+    etr.style.display = isOpen ? '' : 'none';
+    const etd = document.createElement('td');
+    etd.colSpan = 5; etd.style.padding = '0';
+    etr.appendChild(etd);
+    if (isOpen && !swRendered.has(pkey)) swFillExpand(etd, p, sf);
+    frag.appendChild(etr);
+  }
+
+  tbody.appendChild(frag);
+}
+
+function swRenderPagination(totalPages) {
+  if (totalPages <= 1) return;
+  const tbody = document.getElementById('sw-tbody');
+  const row   = document.createElement('tr');
+  row.id = 'sw-pagination';
+  const hasPrev = swPage > 0;
+  const hasNext = swPage < totalPages - 1;
+  row.innerHTML = `<td colspan="5" style="text-align:center;padding:12px 0;border-top:1px solid var(--gray-100)">
+    <div style="display:inline-flex;align-items:center;gap:12px;font-size:13px">
+      <button class="btn btn-outline btn-sm" onclick="swGotoPage(${swPage-1})" ${hasPrev?'':'disabled'}>← Previous</button>
+      <span style="color:var(--gray-500)">Page ${swPage+1} of ${totalPages}</span>
+      <button class="btn btn-outline btn-sm" onclick="swGotoPage(${swPage+1})" ${hasNext?'':'disabled'}>Next →</button>
+    </div>
+  </td>`;
+  tbody.appendChild(row);
+}
+
+function swGotoPage(page) {
+  swPage = page;
+  swExpanded.clear();
+  swRendered.clear();
+  renderSoftwareInventory();
+  document.getElementById('sw-table')?.scrollIntoView({behavior:'smooth', block:'start'});
+}
+
+function swToggle(htr, p, sf) {
+  const pkey = `${p.vendor}:${p.product}`;
+  const etr  = htr.nextElementSibling;   // always the expand row
+  const icon = htr.querySelector('.sw-icon');
+  const etd  = etr?.querySelector('td');
+  const open = swExpanded.has(pkey);
+
+  if (open) {
+    swExpanded.delete(pkey);
+    if (etr) etr.style.display = 'none';
+    if (icon) icon.textContent = '▸';
+  } else {
+    swExpanded.add(pkey);
+    if (etr) etr.style.display = '';
+    if (icon) icon.textContent = '▾';
+    // Lazy-fill expand row on first open
+    if (etd && !swRendered.has(pkey)) swFillExpand(etd, p, sf);
+  }
+}
+
+function swFillExpand(etd, p, sf) {
+  const pkey = `${p.vendor}:${p.product}`;
+  swRendered.add(pkey);
+
+  const vWrap = document.createElement('div');
+  vWrap.style.cssText = 'padding:4px 0 8px 28px;background:#f8fbff;border-top:1px solid var(--gray-100)';
+
+  const versions = sf ? p.versions.filter(v => v.eol_status === sf) : p.versions;
+
+  versions.forEach(v => {
+    const accent = {eol:'var(--red)',eol_soon:'var(--orange)',supported:'var(--green)',not_tracked:'var(--gray-300)',unknown:'var(--gray-300)'}[v.eol_status]||'var(--gray-300)';
+
+    const vBlock = document.createElement('div');
+    vBlock.style.cssText = `border-left:3px solid ${accent};padding:8px 12px;margin:6px 12px 0 0;border-radius:0 6px 6px 0;background:#fff;border:1px solid var(--gray-100);border-left:3px solid ${accent}`;
+
+    const vHead = document.createElement('div');
+    vHead.style.cssText = 'display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap';
+    vHead.innerHTML = `
+      <code style="font-size:12px;background:var(--gray-100);padding:1px 7px;border-radius:4px">${esc(v.version)}</code>
+      <span class="badge ${v.eol_status}"><span class="dot ${v.eol_status}"></span>${statusLabel(v.eol_status)}</span>
+      ${v.eol_date?`<span style="font-size:11px;color:var(--gray-400)">EOL: ${esc(v.eol_date)} ${v.days_remaining!=null?'('+daysStr(v.days_remaining)+')':''}</span>`:''}
+      ${v.eol_url?`<a href="${esc(v.eol_url)}" target="_blank" style="font-size:11px;color:var(--accent);text-decoration:none;margin-left:auto">endoflife.date ↗</a>`:''}
+      <span style="font-size:11px;color:var(--gray-400);${v.eol_url?'':'margin-left:auto'}">${v.asset_count} asset${v.asset_count!==1?'s':''}</span>`;
+    vBlock.appendChild(vHead);
+
+    // Asset chips — resolve ids from swAssetMap
+    const chips = document.createElement('div');
+    chips.style.cssText = 'display:flex;flex-wrap:wrap;gap:5px';
+    (v.asset_ids || []).forEach(aid => {
+      const info = swAssetMap.get(aid) || {name: aid.slice(0,8)+'…', ip: ''};
+      const chip = document.createElement('div');
+      chip.style.cssText = 'cursor:pointer;background:#f8fbff;border:1px solid var(--border);border-radius:6px;padding:3px 9px;font-size:12px;display:inline-flex;align-items:center;gap:5px;transition:border-color .15s';
+      chip.innerHTML = `<span>${esc(info.name)}</span>${info.ip?`<span style="color:var(--gray-400);font-size:11px">${esc(info.ip)}</span>`:''}`;
+      chip.addEventListener('mouseenter', ()=>chip.style.borderColor='var(--accent)');
+      chip.addEventListener('mouseleave', ()=>chip.style.borderColor='var(--border)');
+      chip.addEventListener('click', e=>{e.stopPropagation(); openAssetModal(aid);});
+      chips.appendChild(chip);
+    });
+    vBlock.appendChild(chips);
+    vWrap.appendChild(vBlock);
+  });
+
+  etd.appendChild(vWrap);
+}
+
+// ── Shared helpers ──────────────────────────────────────
+function miniCards(counts, total, noun='asset') {
+  const plural = n => n===1?noun:noun+'s';
+  return `
+    <div class="card red"  style="min-width:0"><div class="card-label">End of Life</div><div class="card-value red">${counts.eol||0}</div><div class="card-sub">${plural(counts.eol||0)}</div></div>
+    <div class="card orange" style="min-width:0"><div class="card-label">EOL Within 90 Days</div><div class="card-value orange">${counts.eol_soon||0}</div><div class="card-sub">${plural(counts.eol_soon||0)}</div></div>
+    <div class="card green"  style="min-width:0"><div class="card-label">Supported</div><div class="card-value green">${counts.supported||0}</div><div class="card-sub">${plural(counts.supported||0)}</div></div>
+    <div class="card gray"   style="min-width:0"><div class="card-label">Unknown</div><div class="card-value gray">${counts.unknown||0}</div><div class="card-sub">${plural(counts.unknown||0)}</div></div>
+    <div class="card blue"   style="min-width:0"><div class="card-label">Total</div><div class="card-value blue">${total}</div><div class="card-sub">${plural(total)}</div></div>`;
+}
+
+function daysStr(daysLeft) {
+  if (daysLeft == null) return '—';
+  if (daysLeft < 0)   return `<span style="color:var(--red);font-weight:600">${Math.abs(daysLeft)}d ago</span>`;
+  if (daysLeft < 90)  return `<span style="color:var(--orange);font-weight:600">${daysLeft}d</span>`;
+  return `${daysLeft}d`;
+}
+
+function downloadCSV(rows, prefix) {
+  const csv = rows.map(r => r.map(v => '"'+String(v??'').replace(/"/g,'""')+'"').join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,'+encodeURIComponent(csv);
+  a.download = prefix+'-'+new Date().toISOString().slice(0,10)+'.csv';
+  a.click();
+  toast('CSV exported','success');
+}
+
+// ── Asset detail modal ─────────────────────────────────
+function openAssetModal(assetId) {
+  const a = allAssets.find(x => x.id === assetId);
+  if (!a) return;
+
+  // Header
+  document.getElementById('dm-name').textContent = a.name;
+  const ipStr = (a.ips||[]).slice(0,3).join(', ') || 'No IPs';
+  document.getElementById('dm-subtitle').textContent = ipStr + (a.os ? ' · ' + a.os : '');
+  // Badge reflects worst APP EOL status; falls back to OS then overall
+  const _appEntries = (a.eol_entries||[]).filter(e => e.type==='Application');
+  const _appPri = {eol:0,eol_soon:1,supported:2,unknown:3};
+  const _worstApp = _appEntries.reduce((b,e)=>(_appPri[e.status]??3)<(_appPri[b?.status]??3)?e:b, null);
+  const _osEntry = (a.eol_entries||[]).find(e=>e.type==='Operating System'||e.source==='os');
+  const _badgeStatus = _worstApp?.status || _osEntry?.status || assetOverallStatus(a);
+  const badge = document.getElementById('dm-status-badge');
+  badge.className = 'badge ' + _badgeStatus;
+  badge.innerHTML = `<span class="dot ${_badgeStatus}"></span>${statusLabel(_badgeStatus)}`;
+
+  const attr = a.attributes || {};
+  const body = document.getElementById('asset-modal-body');
+
+  // ── Identity section ─────────────────────────────────
+  const allIPs   = [...new Set([...(a.ips||[]), ...(attr.ipv6s||[])])];
+  const allHosts = [...new Set([...(attr.fqdns||[]), ...(a.hostnames||[]), ...(attr.netbios_names||[])])];
+  const allMACs  = attr.mac_addresses || [];
+
+  let html = `<div class="detail-section">
+    <div class="detail-section-title">Identity</div>
+    <div class="attr-grid">
+      ${attrItem('Asset ID', a.id, true)}
+      ${attrItem('Operating System', a.os || '—')}
+      ${allIPs.length    ? attrItem('IP Addresses',  allIPs.join(', '), true)  : ''}
+      ${allHosts.length  ? attrItem('Hostnames / FQDNs', allHosts.join(', ')) : ''}
+      ${allMACs.length   ? attrItem('MAC Addresses', allMACs.join(', '), true) : ''}
+      ${attr.system_types?.length ? attrItem('System Type', attr.system_types.join(', ')) : ''}
+      ${attr.bios_uuid   ? attrItem('BIOS UUID', attr.bios_uuid, true) : ''}
+    </div>
+  </div>`;
+
+  // ── Scan & agent section ──────────────────────────────
+  const fmtDate = ts => {
+    if (!ts) return '—';
+    try { return new Date(ts).toLocaleString(); } catch(e) { return ts; }
+  };
+  html += `<div class="detail-section">
+    <div class="detail-section-title">Scan Information</div>
+    <div class="attr-grid">
+      ${attrItem('Last Seen',      fmtDate(a.last_seen))}
+      ${attrItem('First Seen',     fmtDate(attr.first_seen))}
+      ${attrItem('Last Scan',      fmtDate(attr.last_scan_time))}
+      ${attrItem('Has Agent',      attr.has_agent ? 'Yes' : 'No')}
+      ${attr.agent_uuid  ? attrItem('Agent UUID',   attr.agent_uuid, true) : ''}
+      ${attr.network_name? attrItem('Network',      attr.network_name)     : ''}
+      ${attr.sources?.length ? attrItem('Sources',  attr.sources.join(', ')) : ''}
+    </div>
+  </div>`;
+
+  // ── Risk scores ───────────────────────────────────────
+  if (attr.acr_score != null || attr.aes_score != null) {
+    const acrVal = attr.acr_score;
+    const acrClass = acrVal == null ? '' : acrVal <= 3 ? 'acr-low' : acrVal <= 7 ? 'acr-mid' : 'acr-high';
+    html += `<div class="detail-section">
+      <div class="detail-section-title">Risk Scores</div>
+      <div style="display:flex;gap:24px;align-items:center;flex-wrap:wrap">
+        ${acrVal != null ? `<div style="display:flex;align-items:center;gap:10px">
+          <div class="acr-badge ${acrClass}">${acrVal}</div>
+          <div><div style="font-size:12px;font-weight:600">ACR Score</div>
+          <div style="font-size:11px;color:var(--gray-400)">Asset Criticality (0–10)</div></div></div>` : ''}
+        ${attr.aes_score != null ? `<div style="display:flex;align-items:center;gap:10px">
+          <div class="acr-badge acr-mid">${attr.aes_score}</div>
+          <div><div style="font-size:12px;font-weight:600">AES Score</div>
+          <div style="font-size:11px;color:var(--gray-400)">Asset Exposure</div></div></div>` : ''}
+      </div>
+    </div>`;
+  }
+
+  // ── Tags ──────────────────────────────────────────────
+  const assetTags = a.tags || attr.tags || [];
+  if (assetTags.length) {
+    html += `<div class="detail-section">
+      <div class="detail-section-title">Asset Tags</div>
+      <div>${assetTags.map(t => {
+        const cat = t.category || t.key || '';
+        const val = t.value || '';
+        return `<span class="tag-pill">${esc(cat)}: ${esc(val)}</span>`;
+      }).join('')}</div>
+    </div>`;
+  }
+
+  // ── EOL Analysis ──────────────────────────────────────
+  const entries = a.eol_entries || [];
+  html += `<div class="detail-section">
+    <div class="detail-section-title">EOL Analysis (${entries.length} item${entries.length===1?'':'s'})</div>`;
+  if (!entries.length) {
+    html += `<p style="color:var(--gray-400);font-size:13px">No EOL data matched for this asset.</p>`;
+  } else {
+    html += `<table class="eol-table">
+      <thead><tr>
+        <th>Name</th><th>Type</th><th>Status</th><th>EOL Date</th><th>Days Remaining</th><th>Ref</th>
+      </tr></thead><tbody>`;
+    entries.forEach(e => {
+      const daysLeft = e.days_remaining;
+      const dStr = daysLeft == null ? '—'
+        : daysLeft < 0 ? `<span style="color:var(--red);font-weight:600">${Math.abs(daysLeft)}d ago</span>`
+        : daysLeft < 90 ? `<span style="color:var(--orange);font-weight:600">${daysLeft}d</span>`
+        : `${daysLeft}d`;
+      const refLink = e.eol_url
+        ? `<a href="${esc(e.eol_url)}" target="_blank"
+             style="color:var(--accent);text-decoration:none;font-size:12px;font-weight:600"
+             title="View on endoflife.date">↗</a>`
+        : '<span style="color:var(--gray-300)">—</span>';
+      html += `<tr>
+        <td style="font-weight:500">${esc(e.name||e.product||'—')}</td>
+        <td><span style="font-size:11px;font-weight:600;text-transform:uppercase;color:var(--gray-400)">${esc(e.type||'—')}</span></td>
+        <td><span class="badge ${e.status}">${statusLabel(e.status)}</span></td>
+        <td>${esc(e.eol_date||'—')}</td>
+        <td>${dStr}</td>
+        <td>${refLink}</td>
+      </tr>`;
+    });
+    html += `</tbody></table>`;
+  }
+  html += `</div>`;
+
+  // ── Software Inventory ────────────────────────────────
+  const sw = a.software || [];
+  html += `<div class="detail-section">
+    <div class="detail-section-title">Software Inventory — CPE Strings (${sw.length})</div>`;
+  if (!sw.length) {
+    html += `<p style="color:var(--gray-400);font-size:13px">No software inventory data from Tenable.</p>`;
+  } else {
+    html += `<div class="software-list">`;
+    sw.forEach(cpe => { html += `<div class="software-item">${esc(cpe)}</div>`; });
+    html += `</div>`;
+  }
+  html += `</div>`;
+
+  body.innerHTML = html;
+  document.getElementById('asset-modal').classList.add('open');
+}
+
+function closeAssetModal() {
+  document.getElementById('asset-modal').classList.remove('open');
+}
+
+function attrItem(label, value, mono=false) {
+  if (!value || value === '—') return '';
+  return `<div class="attr-item">
+    <div class="attr-label">${esc(label)}</div>
+    <div class="attr-value${mono?' mono':''}">${esc(String(value))}</div>
+  </div>`;
+}
+
+// Close modal on backdrop click
+document.addEventListener('click', e => {
+  if (e.target.id === 'asset-modal') closeAssetModal();
+});
+
+// ── Utility ────────────────────────────────────────────
+function statusLabel(s) {
+  return {eol:'End of Life', eol_soon:'EOL Soon', supported:'Supported', unknown:'Unknown', not_tracked:'Not Tracked'}[s] || s;
+}
+function esc(s) { return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function toast(msg, type='') {
+  const c = document.getElementById('toasts');
+  const t = document.createElement('div');
+  t.className = 'toast'+(type?' '+type:'');
+  t.textContent = msg;
+  c.appendChild(t);
+  setTimeout(() => t.remove(), 3500);
+}
+</script>
+</body>
+</html>
