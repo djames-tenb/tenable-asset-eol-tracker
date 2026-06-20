@@ -8,7 +8,7 @@ type: "tool"
 tier: "unreviewed"
 tags: ["eol", "vulnerability-management", "asset-management", "end-of-life", "tenable-vm", "python", "endoflife-date", "lifecycle", "patch-management", "dashboard", "software-inventory", "cpe", "os-lifecycle", "security-operations"]
 framework: "Python + SQLite"
-integrations: ["Tenable VM", "Tenable One"]
+integrations: ["Tenable"]
 date_added: 2026-06-20
 ---
 
