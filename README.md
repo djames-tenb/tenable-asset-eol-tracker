@@ -1,6 +1,6 @@
 # Tenable Asset EOL Tracker
 
-A self-hosted web portal that syncs all assets from a Tenable VM / Tenable One tenant and shows their end-of-life (EOL) status across five purpose-built views — no spreadsheets, no external services, no API calls at page load.
+A self-hosted web portal that syncs all assets from a Tenable VM / Tenable One tenant and shows their end-of-life (EOL) status, ranked by asset criticality — no spreadsheets, no external services, no API calls at page load.
 
 Works entirely with Python's standard library: no `pip install`, no Docker, no external dependencies.
 
@@ -12,15 +12,18 @@ Works entirely with Python's standard library: no `pip install`, no Docker, no e
 - **EOL correlation** — maps each OS and application to the corresponding [endoflife.date](https://endoflife.date) lifecycle data, then classifies every asset as **EOL**, **EOL Soon** (≤ 90 days), **Supported**, or **Unknown**
 - **Local cache** — all Tenable data and EOL cycle data are stored in a local SQLite database; every page loads instantly without live API calls
 - **Multi-tenant** — supports multiple Tenable tenants in a single instance; credentials are encrypted at rest
-- **Tag filtering** — filter any view by Tenable asset tags (environment, business unit, owner, or any custom category) — available on all five pages
+- **Criticality ranking** — every view surfaces Tenable's ACR so you can separate "EOL" from "EOL *and* business critical"
+- **EOL trend** — one history point per sync, so you can show whether exposure is shrinking rather than just how bad it is today
+- **Tag filtering** — filter any view by Tenable asset tags (environment, business unit, owner, or any custom category)
 
 ---
 
-## Five Views
+## Three Views
 
-### OS EOL Overview Dashboard
-The landing page. Shows OS end-of-life status across your entire estate with:
-- **Summary cards** — EOL / EOL Soon / Supported / Unknown / Total asset counts, each clickable to drill directly to the OS EOL page with the matching status filter pre-applied
+### EOL Overview Dashboard
+The landing page. Shows end-of-life status across your entire estate with:
+- **Summary cards** — EOL / EOL Soon / Supported / Unknown / Total, plus **Critical & EOL** (ACR ≥ 7 and EOL or EOL Soon). Each is clickable and drills into Asset Inventory with the matching filters pre-applied
+- **EOL trend** — status counts over time, one point per completed sync, so you can show direction rather than just a snapshot
 - **Upcoming EOLs** — OS versions expiring within the next 180 days, sorted by urgency with colour-coded countdowns
 - **Top EOL OS Versions** — ranked list of OS versions with the most EOL or EOL-Soon assets, with split bar showing EOL vs EOL-Soon proportion
 - **EOL by Tag** — stacked bar comparing EOL / EOL Soon / Supported / Unknown across tag values for any selected tag category
@@ -28,21 +31,16 @@ The landing page. Shows OS end-of-life status across your entire estate with:
 - **Tag filter** — all cards and charts scope to the selected tag
 
 ### Asset Inventory
-Filterable list of all synced assets. Filter by OS family, EOL status, and asset tags. Paginated (50 per page); search bypasses pagination and shows all matches. Click any row to open the **Drill-Down panel** showing:
+Per-asset view, filterable by OS family, EOL status, ACR, and asset tags. The **Scope** selector switches the row status between *All*, *OS only*, and *Applications only* — OS-only reproduces a dedicated OS lifecycle view without a separate page. Sortable ACR column. Paginated (50 per page); search bypasses pagination and shows all matches. Click any row to open the **Drill-Down panel** showing:
 - Identity attributes (hostnames, IPs, last seen, tenant)
 - Scan metadata (ACR score, AES score, scanner type)
 - Full EOL analysis — one row per matched product/cycle with status, EOL date, and endoflife.date reference
+- **Why unknown** — per-CPE explanation of why a lifecycle match was not found (no vendor mapping, version outside the tracked range, suppressed rolling release, and so on)
 - Tenable asset tags
 - Raw installed-software CPE inventory
 
-### OS EOL
-Per-asset view of operating system end-of-life status. Filter by OS family, EOL status, and asset tags. Paginated (50 per page) with full-text search.
-
-### App EOL
-Grouped by unique (product, version) pair across the entire estate. Expand any row to see which assets are running that version. Filter by EOL status and asset tags. Paginated (50 per page) with full-text search.
-
 ### Software Inventory
-Server-side aggregated view of all detected software CPE strings. Groups by product and lists all detected versions with asset counts. Expand a version to see the individual assets. Tag-filtered server-side, lazy-rendered for performance.
+Server-side aggregated view of all detected software CPE strings. Groups by product and lists all detected versions with EOL status and asset counts. Expand a version to see the individual assets. Tick **Tracked only** to hide software with no endoflife.date mapping, which gives you a pure application-lifecycle view. Tag-filtered server-side, lazy-rendered for performance.
 
 ---
 
@@ -83,11 +81,28 @@ All tenant configuration is stored in `config.json`. API credentials are encrypt
 
 **Never commit `config.json` or `.eol_portal_secret` to source control.** Both are in `.gitignore`.
 
-To change the listening port:
+### Environment variables
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `PORT` | `5555` | Listening port |
+| `EOL_BIND` | `127.0.0.1` | Bind address. The app has **no authentication** and holds Tenable API keys, so it listens on loopback only. Set `0.0.0.0` to expose it deliberately and restrict access at the network layer |
+| `EOL_SOURCES` | `NESSUS_SCAN,NESSUS_AGENT` | Asset sources to analyse. ASM/EASM-discovered assets carry no OS or installed-software data, so they can never match a lifecycle entry and only inflate the Unknown count. Set `*` to keep every source |
+| `EOL_INSECURE_TLS` | unset | Set to `1` to skip TLS certificate verification. Only for a Tenable instance behind a self-signed certificate — it exposes your API keys to interception |
 
 ```bash
-PORT=8080 python3 app.py
+PORT=8080 EOL_BIND=0.0.0.0 python3 app.py
 ```
+
+### Sync modes
+
+`POST /api/jobs` accepts:
+
+| Field | Effect |
+|---|---|
+| `tenant_id` | Required |
+| `mode` | `full` (default) replaces every asset for the tenant. `delta` exports only assets whose `updated_at` moved since the last sync — much faster, but it cannot detect deleted assets, so run a full sync periodically to reconcile |
+| `force_eol` | `true` re-downloads every endoflife.date feed, ignoring the 24-hour cache. Useful immediately before a demo |
 
 ---
 
