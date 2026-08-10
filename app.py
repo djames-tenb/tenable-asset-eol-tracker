@@ -23,13 +23,31 @@ DB_FILE      = os.path.join(BASE_DIR, "eol_data.db")
 TEMPLATE     = os.path.join(BASE_DIR, "templates", "index.html")
 SECRETS_FILE = os.path.join(BASE_DIR, ".eol_portal_secret")
 PORT         = int(os.environ.get("PORT", 5555))
+# Loopback by default: this process holds Tenable API keys and has no
+# authentication of its own.  Set EOL_BIND=0.0.0.0 to expose it deliberately
+# (e.g. running on a lab VM and browsing from elsewhere).
+BIND_HOST    = os.environ.get("EOL_BIND", "127.0.0.1")
+
+# Asset sources worth analysing.  EASM/ASM-discovered assets carry no
+# operating_systems and no installed_software, so they can never produce a
+# lifecycle match and would otherwise swamp the dashboard as "Unknown".
+# Override with EOL_SOURCES="NESSUS_SCAN,NESSUS_AGENT,PVS" or "*" for all.
+_sources_env = os.environ.get("EOL_SOURCES", "NESSUS_SCAN,NESSUS_AGENT").strip()
+VM_SOURCES   = None if _sources_env == "*" else {
+    s.strip().upper() for s in _sources_env.split(",") if s.strip()
+}
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("eol_portal")
 
+# Verify TLS by default.  Set EOL_INSECURE_TLS=1 only for a Tenable instance
+# behind a self-signed certificate, and understand that it exposes the API
+# keys in every request to interception.
 ssl_ctx = ssl.create_default_context()
-ssl_ctx.check_hostname = False
-ssl_ctx.verify_mode    = ssl.CERT_NONE
+if os.environ.get("EOL_INSECURE_TLS") == "1":
+    ssl_ctx.check_hostname = False
+    ssl_ctx.verify_mode    = ssl.CERT_NONE
+    log.warning("EOL_INSECURE_TLS=1 — TLS certificate verification is DISABLED")
 
 # ── Active jobs {job_id: {...}} ──────────────────────────────────────────────
 _jobs:     dict = {}
@@ -405,41 +423,53 @@ def _get_or_create_secret() -> bytes:
     return key
 
 
+# Explicit ciphertext marker.  The previous implementation guessed by
+# base64-decoding and checking length, which misclassified plaintext keys: a
+# real 64-hex-character Tenable key is valid base64 (48 bytes), so it was
+# treated as already-encrypted, XOR-garbled, and only survived because the
+# resulting bytes failed .decode() and hit the fallback.  A marker removes
+# the guess entirely.
+_ENC_PREFIX = "enc:v1:"
+
+
 def _is_encrypted(s: str) -> bool:
-    """Heuristic: is s an encrypted credential (base64, ≥17 decoded bytes)?"""
-    if not s or len(s) < 24:
-        return False
-    try:
-        raw = base64.b64decode(s, validate=True)
-        return len(raw) >= 17   # 16-byte salt + ≥1 byte ciphertext
-    except Exception:
-        return False
+    """True only for values written by encrypt_credential()."""
+    return bool(s) and s.startswith(_ENC_PREFIX)
 
 
 def encrypt_credential(plaintext: str) -> str:
-    """Encrypt a credential.  Returns base64(salt‖ciphertext)."""
+    """Encrypt a credential.  Returns "enc:v1:" + base64(salt‖ciphertext)."""
     if not plaintext:
         return ""
+    if _is_encrypted(plaintext):
+        return plaintext          # already ciphertext — never double-encrypt
     key  = _get_or_create_secret()
     salt = os.urandom(16)
     data = plaintext.encode()
     ks   = hashlib.pbkdf2_hmac("sha256", key, salt, 100_000, dklen=len(data))
     ct   = bytes(a ^ b for a, b in zip(data, ks))
-    return base64.b64encode(salt + ct).decode()
+    return _ENC_PREFIX + base64.b64encode(salt + ct).decode()
 
 
 def decrypt_credential(ciphertext: str) -> str:
-    """Decrypt a credential produced by encrypt_credential."""
-    if not ciphertext:
-        return ""
+    """Decrypt a value produced by encrypt_credential.
+
+    Unmarked values are returned untouched: they are plaintext awaiting
+    migration, not ciphertext to be mangled.
+    """
+    if not ciphertext or not _is_encrypted(ciphertext):
+        return ciphertext
     try:
-        raw      = base64.b64decode(ciphertext)
+        raw      = base64.b64decode(ciphertext[len(_ENC_PREFIX):])
         salt, ct = raw[:16], raw[16:]
         key      = _get_or_create_secret()
         ks       = hashlib.pbkdf2_hmac("sha256", key, salt, 100_000, dklen=len(ct))
         return bytes(a ^ b for a, b in zip(ct, ks)).decode()
-    except Exception:
-        return ciphertext   # fallback: treat as plaintext (migration path)
+    except Exception as e:
+        log.error("Failed to decrypt a stored credential (%s). If the key file "
+                  "%s was lost or replaced, re-enter the tenant's API keys.",
+                  e, SECRETS_FILE)
+        return ""
 
 
 # ── Database ─────────────────────────────────────────────────────────────────
@@ -480,6 +510,21 @@ def init_db():
             new_in_delta     INTEGER DEFAULT 0,
             updated_in_delta INTEGER DEFAULT 0
         );
+
+        -- One row per completed sync: lets the dashboard plot EOL debt over
+        -- time.  Without it, replace_all destroys the previous state on every
+        -- sync and there is no way to show whether exposure is improving.
+        CREATE TABLE IF NOT EXISTS eol_history (
+            id          INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id   TEXT NOT NULL,
+            ts          REAL NOT NULL,
+            eol         INTEGER DEFAULT 0,
+            eol_soon    INTEGER DEFAULT 0,
+            supported   INTEGER DEFAULT 0,
+            unknown     INTEGER DEFAULT 0,
+            total       INTEGER DEFAULT 0
+        );
+        CREATE INDEX IF NOT EXISTS idx_history_tenant ON eol_history(tenant_id, ts);
 
         CREATE TABLE IF NOT EXISTS eol_cycles (
             product     TEXT PRIMARY KEY,
@@ -604,6 +649,44 @@ def db_update_sync_state(tenant_id: str, mode: str, count: int,
             # UPDATE clause params
             mode, now, mode, now, count, mode, new, updated
         ))
+
+
+def db_record_history(tenant_id: str) -> dict:
+    """Append one point to eol_history for the tenant's current state.
+
+    Counts come from re-evaluated eol_entries rather than the stored
+    overall_status column, for the same reason /api/summary does: the column
+    holds the status as of the sync that wrote it.
+    """
+    counts = {"eol": 0, "eol_soon": 0, "supported": 0, "unknown": 0}
+    with get_conn() as con:
+        rows = con.execute(
+            "SELECT eol_entries FROM assets WHERE tenant_id=?", (tenant_id,)
+        ).fetchall()
+        for r in rows:
+            entries = refresh_entries_status(json.loads(r["eol_entries"] or "[]"))
+            st = _recompute_overall_status(entries)
+            counts[st] = counts.get(st, 0) + 1
+        total = sum(counts.values())
+        con.execute(
+            "INSERT INTO eol_history (tenant_id, ts, eol, eol_soon, supported, "
+            "unknown, total) VALUES (?,?,?,?,?,?,?)",
+            (tenant_id, time.time(), counts["eol"], counts["eol_soon"],
+             counts["supported"], counts["unknown"], total)
+        )
+    log.info(f"Recorded EOL history for {tenant_id}: {counts} (total {total})")
+    return {**counts, "total": total}
+
+
+def db_get_history(tenant_id: str, limit: int = 365) -> list:
+    """Return history points for a tenant, oldest first."""
+    with get_conn() as con:
+        rows = con.execute(
+            "SELECT ts, eol, eol_soon, supported, unknown, total "
+            "FROM eol_history WHERE tenant_id=? ORDER BY ts DESC LIMIT ?",
+            (tenant_id, limit)
+        ).fetchall()
+    return [dict(r) for r in reversed(rows)]
 
 # ── Config ────────────────────────────────────────────────────────────────────
 
@@ -808,13 +891,21 @@ def _load_eol_from_db():
 def find_eol_cycle(product: str, version: str) -> dict | None:
     """Match a version string to the best-fitting cycle in the EOL cache.
 
-    Three passes (in decreasing specificity):
+    Four passes (in decreasing specificity):
     1. Exact string match              — "1.1.1" == "1.1.1"
     2. version starts with cycle       — "1.24.0".startswith("1.24")  → "1.24"
     3. Normalised cycle match          — strip non-numeric qualifiers
        from the *cycle* name (e.g. "3.5-sp1" → "3.5") and retry exact
        and prefix comparisons.  This covers endoflife.date quirks like
        dotnetfx "3.5-sp1" being the only entry for .NET 3.5.
+    4. Reverse prefix                  — cycle more specific than version,
+       e.g. version "12" matching cycle "12.5" (SLES service packs).
+
+    Within passes 2-4 candidates are evaluated longest-cycle-first, so the
+    most specific cycle always wins.  Iterating in raw API order instead
+    made the result depend on how endoflife.date happened to sort its
+    array: version "3.4.1" against cycles ["3", "3.4"] could resolve to
+    either, silently reporting the wrong lifecycle.
     """
     if not product or not version:
         return None
@@ -822,19 +913,26 @@ def find_eol_cycle(product: str, version: str) -> dict | None:
     with EOL_LOCK:
         cycles = list(EOL_CACHE.get(product, []))
 
+    # Longest cycle string first = most specific match first.  Ties keep the
+    # original API order, which is newest-first, matching prior behaviour.
+    by_specificity = sorted(
+        cycles, key=lambda c: len(str(c.get("cycle", ""))), reverse=True
+    )
+
     # Pass 1 – exact match
     for c in cycles:
         if str(c.get("cycle", "")).lower() == v:
             return c
 
     # Pass 2 – version is a prefix of the cycle key (e.g. "3.4.0" → "3.4")
-    for c in cycles:
-        if v.startswith(str(c.get("cycle", "")).lower()):
+    for c in by_specificity:
+        cyc = str(c.get("cycle", "")).lower()
+        if cyc and v.startswith(cyc):
             return c
 
     # Pass 3 – strip qualifier suffixes from cycle (e.g. "3.5-sp1" → "3.5")
     # and retry.  Only strip if the raw cycle contained a "-" or "_" separator.
-    for c in cycles:
+    for c in by_specificity:
         raw_cycle = str(c.get("cycle", "")).lower()
         if "-" not in raw_cycle and "_" not in raw_cycle:
             continue  # no qualifier to strip; already tried in passes 1/2
@@ -844,8 +942,7 @@ def find_eol_cycle(product: str, version: str) -> dict | None:
 
     # Pass 4 – cycle is more specific than version (reverse prefix).
     # E.g. version="12" matches cycle "12.5" (SLES service-pack cycles).
-    # Takes the first match, which is typically the most recent cycle from the API.
-    for c in cycles:
+    for c in by_specificity:
         cyc = str(c.get("cycle", "")).lower()
         if cyc.startswith(v + "."):
             return c
@@ -1287,6 +1384,25 @@ def export_assets(tenant: dict, since_ts: float | None = None,
 
     log.info(f"Export complete: {len(assets)} raw assets downloaded")
 
+    # ── Client-side source filter ────────────────────────────────────────
+    # "sources" is not a documented /assets/export filter field, so scope it
+    # here.  Without this, ASM/EASM-discovered assets dominate the result:
+    # they carry no operating_systems and no installed_software, so they can
+    # never match a lifecycle entry and land in the DB as permanent
+    # "Unknown" rows.  On a real tenant that was 26,637 of 28,138 assets —
+    # a dashboard reading 98% grey.
+    if VM_SOURCES is not None:
+        before = len(assets)
+        assets = [
+            a for a in assets
+            if any((s.get("name") or "").upper() in VM_SOURCES
+                   for s in (a.get("sources") or []))
+        ]
+        if before != len(assets):
+            log.info(f"Filtered to {len(assets)} assets from sources "
+                     f"{sorted(VM_SOURCES)} (dropped {before - len(assets)}; "
+                     f"set EOL_SOURCES=* to keep all)")
+
     # ── Client-side 90-day last_seen filter ──────────────────────────────
     # The export API doesn't support a last_seen filter directly.
     # Drop assets not seen in the past 90 days to keep the DB lean.
@@ -1467,9 +1583,24 @@ def _run_sync_job(job_id: str, tenant_id: str, mode: str, force_eol: bool = Fals
         _job_update(job_id, status="warming", phase="Refreshing EOL reference data…")
         refresh_eol_cache(force=force_eol)
 
-        # ── Step 1: export all assets from Tenable ───────────────────────────
-        _job_update(job_id, status="fetching", phase="Starting asset export…")
-        raws = export_assets(tenant, since_ts=None, job_id=job_id)
+        # ── Step 1: export assets from Tenable ───────────────────────────────
+        # Delta uses the newest of the last full/delta sync as the watermark
+        # and filters the export on updated_at.  It cannot observe deletions —
+        # a removed asset simply stops appearing — so a periodic full sync is
+        # still required to reconcile.  Falls back to full when there is no
+        # prior sync to measure from.
+        since_ts = None
+        if mode == "delta":
+            ss = db_get_sync_state(tenant_id)
+            since_ts = max(ss.get("last_full_sync") or 0,
+                           ss.get("last_delta_sync") or 0) or None
+            if since_ts is None:
+                log.info(f"[{job_id}] No previous sync — promoting delta to full")
+                mode = "full"
+
+        _job_update(job_id, status="fetching", mode=mode,
+                    phase=f"Starting asset export ({mode})…")
+        raws = export_assets(tenant, since_ts=since_ts, job_id=job_id)
 
         total = len(raws)
         log.info(f"[{job_id}] {total} assets exported from Tenable ({mode})")
@@ -1513,16 +1644,34 @@ def _run_sync_job(job_id: str, tenant_id: str, mode: str, force_eol: bool = Fals
         # Ensure overall_status is consistent with eol_entries before saving
         for a in assets:
             a["overall_status"] = _recompute_overall_status(a.get("eol_entries", []))
-        final_count = db_upsert_assets(tenant_id, assets, replace_all=True)
-        db_update_sync_state(tenant_id, "full", final_count)
+
+        # Only a full sync may clear the tenant's existing rows.  A delta
+        # export returns a subset, so replace_all there would delete every
+        # asset that simply hadn't changed.
+        if mode == "delta":
+            existing = {a["id"] for a in db_get_assets(tenant_id)}
+            new_ids  = {a["id"] for a in assets} - existing
+            new_n    = len(new_ids)
+            upd_n    = len(assets) - new_n
+        else:
+            new_n = upd_n = 0
+
+        final_count = db_upsert_assets(tenant_id, assets,
+                                       replace_all=(mode == "full"))
+        db_update_sync_state(tenant_id, mode, final_count,
+                             new=new_n, updated=upd_n)
+        db_record_history(tenant_id)
 
         _job_update(job_id,
                     status="done",
                     total_in_db=final_count,
                     fetched=total,
-                    mode="full",
+                    new_assets=new_n,
+                    updated_assets=upd_n,
+                    mode=mode,
                     phase="Complete")
-        log.info(f"[{job_id}] Done – DB now has {final_count} assets")
+        log.info(f"[{job_id}] Done ({mode}) – DB now has {final_count} assets"
+                 + (f"; {new_n} new, {upd_n} updated" if mode == "delta" else ""))
 
     except Exception as e:
         log.error(f"[{job_id}] Error: {e}")
@@ -1550,7 +1699,8 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type",  "application/json")
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Access-Control-Allow-Origin", "*")
+        # No CORS header.  The UI is same-origin, so a wildcard only let any
+        # website a browser visited read this tenant's asset inventory.
         self.end_headers()
         self.wfile.write(body)
 
@@ -1567,10 +1717,10 @@ class Handler(BaseHTTPRequestHandler):
         return json.loads(self.rfile.read(n)) if n else {}
 
     def do_OPTIONS(self):
+        # Same-origin only; advertise the methods without granting cross-origin
+        # access.
         self.send_response(204)
-        self.send_header("Access-Control-Allow-Origin",  "*")
-        self.send_header("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+        self.send_header("Allow", "GET,POST,PUT,DELETE,OPTIONS")
         self.end_headers()
 
     # ── GET ───────────────────────────────────────────────────────────────────
@@ -1628,6 +1778,14 @@ class Handler(BaseHTTPRequestHandler):
                 "sync_state": sync_state,
                 "from_db":    True,
             }); return
+
+        # EOL debt over time — one point per completed sync
+        if path == "/api/history":
+            tenant_id = (qs.get("tenant") or [""])[0]
+            if not tenant_id:
+                self.send_json({"error": "tenant param required"}, 400); return
+            self.send_json({"tenant_id": tenant_id,
+                            "points": db_get_history(tenant_id)}); return
 
         # Sync state only (lightweight)
         if path == "/api/sync-state":
@@ -1758,7 +1916,10 @@ class Handler(BaseHTTPRequestHandler):
         # GET /api/debug/asset-cpes?name=beehive&tenant=<id>
         # OR  /api/debug/asset-cpes?id=<uuid>&tenant=<id>
         # Shows every CPE string for the asset and why it is/isn't in EOL analysis.
-        if path == "/api/debug/asset-cpes":
+        # /api/asset-cpes is the supported name — the asset modal's
+        # "why unknown" section consumes it.  The /api/debug/ path is kept as
+        # an alias so existing bookmarks and notes keep working.
+        if path in ("/api/asset-cpes", "/api/debug/asset-cpes"):
             tenant_id  = (qs.get("tenant") or [""])[0]
             asset_name = (qs.get("name")   or [""])[0].lower()
             asset_id_q = (qs.get("id")     or [""])[0]
@@ -2147,8 +2308,11 @@ class Handler(BaseHTTPRequestHandler):
             # force_eol=true bypasses EOL_CACHE_TTL and re-downloads every
             # endoflife.date product — useful right before a demo.
             force_eol = bool(body.get("force_eol", False))
-            job_id    = start_job(tenant_id, "full", force_eol=force_eol)
-            self.send_json({"job_id": job_id, "mode": "full",
+            # mode=delta exports only assets whose updated_at moved since the
+            # last sync.  It cannot see deletions, so full remains the default.
+            mode      = "delta" if body.get("mode") == "delta" else "full"
+            job_id    = start_job(tenant_id, mode, force_eol=force_eol)
+            self.send_json({"job_id": job_id, "mode": mode,
                             "force_eol": force_eol}, 202); return
 
         # Add tenant
@@ -2202,8 +2366,12 @@ class Handler(BaseHTTPRequestHandler):
 if __name__ == "__main__":
     init_db()
     _load_eol_from_db()   # seed in-memory cache from persisted cycles
-    server = ThreadingHTTPServer(("0.0.0.0", PORT), Handler)
-    log.info(f"Tenable EOL Portal → http://localhost:{PORT}")
+    server = ThreadingHTTPServer((BIND_HOST, PORT), Handler)
+    log.info(f"Tenable EOL Portal → http://localhost:{PORT}  (bound to {BIND_HOST})")
+    if BIND_HOST not in ("127.0.0.1", "localhost", "::1"):
+        log.warning("Listening on %s — this server has NO authentication and "
+                    "holds Tenable API keys. Restrict access at the network "
+                    "layer, or unset EOL_BIND to bind loopback only.", BIND_HOST)
     log.info("Press Ctrl+C to stop.")
     try:
         server.serve_forever()
