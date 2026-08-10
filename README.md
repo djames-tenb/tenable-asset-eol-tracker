@@ -106,13 +106,53 @@ PORT=8080 EOL_BIND=0.0.0.0 python3 app.py
 
 ---
 
+## Troubleshooting
+
+### `CERTIFICATE_VERIFY_FAILED: unable to get local issuer certificate`
+
+A python.org framework build of Python on macOS ships with an **empty trust
+store** and does not consult the macOS keychain, so every HTTPS request fails
+until its bundled certificates are installed. The app detects an empty store
+and falls back to `certifi` or a system CA bundle automatically, but if it
+logs `No trusted CA certificates found`, fix the interpreter:
+
+```bash
+open "/Applications/Python 3.13/Install Certificates.command"   # match your version
+```
+
+or install `certifi` into whichever environment runs the app:
+
+```bash
+python3 -m pip install certifi
+```
+
+Confirm the store is populated:
+
+```bash
+python3 -c "import ssl; print(len(ssl.create_default_context().get_ca_certs()), 'CA certs')"
+```
+
+Anything other than `0` is fine. `EOL_INSECURE_TLS=1` will also silence the
+error, but it sends your Tenable API keys over an unverified channel — use it
+only for a Tenable instance behind a self-signed certificate.
+
+### Everything shows as "Unknown"
+
+Almost always the asset source mix rather than the matching logic. ASM/EASM
+assets carry no OS or installed-software data, so they cannot be correlated.
+The default `EOL_SOURCES=NESSUS_SCAN,NESSUS_AGENT` excludes them; if you have
+overridden it, that is the first thing to check. For an individual asset, open
+its drill-down and expand **Why unknown** for a per-CPE explanation.
+
+---
+
 ## How It Works
 
 ```
 Tenable VM
    │  Assets Export API (POST /assets/export)
    │  → asset id, hostnames, IPs, OS strings, installed_software CPEs
-   │  → asset tags (Tags API)
+   │  → asset tags, ACR / AES scores, sources
    ↓
 app.py (Python stdlib ThreadingHTTPServer — zero dependencies)
    │  Parses OS strings      → endoflife.date product/cycle

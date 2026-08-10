@@ -10,7 +10,7 @@ Data strategy:
   - Sync runs in a background thread; UI polls /api/jobs/<id> for live progress
 """
 
-import os, re, json, time, ssl, threading, logging, uuid, sqlite3, hashlib, base64
+import os, re, sys, json, time, ssl, threading, logging, uuid, sqlite3, hashlib, base64
 from datetime import date, datetime, timezone, timedelta
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from urllib.request import Request, urlopen
@@ -40,14 +40,79 @@ VM_SOURCES   = None if _sources_env == "*" else {
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 log = logging.getLogger("eol_portal")
 
-# Verify TLS by default.  Set EOL_INSECURE_TLS=1 only for a Tenable instance
-# behind a self-signed certificate, and understand that it exposes the API
-# keys in every request to interception.
-ssl_ctx = ssl.create_default_context()
-if os.environ.get("EOL_INSECURE_TLS") == "1":
-    ssl_ctx.check_hostname = False
-    ssl_ctx.verify_mode    = ssl.CERT_NONE
-    log.warning("EOL_INSECURE_TLS=1 — TLS certificate verification is DISABLED")
+# CA bundles to fall back on when the interpreter's default trust store is
+# empty.  python.org framework builds on macOS ship with NO trusted roots and
+# do not consult the system keychain: every HTTPS call fails with
+# CERTIFICATE_VERIFY_FAILED until "Install Certificates.command" is run, which
+# pip-installs certifi and points the framework's cert.pem at it.  Rather than
+# make every user diagnose that, look for a usable bundle ourselves.
+_CA_BUNDLE_CANDIDATES = (
+    "/etc/ssl/cert.pem",                              # macOS system bundle
+    "/opt/homebrew/etc/ca-certificates/cert.pem",      # Homebrew (Apple silicon)
+    "/usr/local/etc/openssl@3/cert.pem",               # Homebrew (Intel)
+    "/etc/ssl/certs/ca-certificates.crt",              # Debian / Ubuntu
+    "/etc/pki/tls/certs/ca-bundle.crt",                # RHEL / Fedora
+)
+
+
+def _build_ssl_context() -> ssl.SSLContext:
+    """Return a verifying SSL context, repairing an empty trust store if needed.
+
+    Set EOL_INSECURE_TLS=1 to skip verification entirely — only appropriate
+    for a Tenable instance behind a self-signed certificate, and it exposes
+    the API keys in every request to interception.
+    """
+    ctx = ssl.create_default_context()
+
+    if os.environ.get("EOL_INSECURE_TLS") == "1":
+        ctx.check_hostname = False
+        ctx.verify_mode    = ssl.CERT_NONE
+        log.warning("EOL_INSECURE_TLS=1 — TLS certificate verification is DISABLED")
+        return ctx
+
+    try:
+        loaded = len(ctx.get_ca_certs())
+    except Exception:
+        loaded = 0
+    if loaded:
+        return ctx
+
+    # Empty store.  Try certifi (present in most environments, and installed
+    # by Install Certificates.command), then well-known system bundles.
+    try:
+        import certifi
+        ctx.load_verify_locations(certifi.where())
+        log.info("Default CA store was empty — loaded certifi bundle (%s)",
+                 certifi.where())
+        return ctx
+    except Exception:
+        pass
+
+    for path in _CA_BUNDLE_CANDIDATES:
+        try:
+            if os.path.isfile(path):
+                ctx.load_verify_locations(path)
+                if ctx.get_ca_certs():
+                    log.info("Default CA store was empty — loaded CA bundle %s", path)
+                    return ctx
+        except Exception:
+            continue
+
+    log.error(
+        "No trusted CA certificates found, so HTTPS requests to Tenable and "
+        "endoflife.date will fail with CERTIFICATE_VERIFY_FAILED. This is "
+        "usual for a python.org build of Python on macOS. Fix it with:\n"
+        "    open \"/Applications/Python %d.%d/Install Certificates.command\"\n"
+        "or install certifi into the environment running this app:\n"
+        "    python3 -m pip install certifi\n"
+        "As a last resort, set EOL_INSECURE_TLS=1 to skip verification "
+        "(not recommended — your API keys travel over an unverified channel).",
+        sys.version_info[0], sys.version_info[1]
+    )
+    return ctx
+
+
+ssl_ctx = _build_ssl_context()
 
 # ── Active jobs {job_id: {...}} ──────────────────────────────────────────────
 _jobs:     dict = {}
