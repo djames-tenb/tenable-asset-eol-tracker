@@ -528,7 +528,10 @@ def db_get_assets(tenant_id: str) -> list:
         d["software"]    = json.loads(r["software"]    or "[]") if r["software"] else []
         d["attributes"]  = json.loads(r["attributes"]  or "{}") if r["attributes"] else {}
         d["tags"]        = json.loads(r["tags"]        or "[]") if r["tags"] else []
-        # Always recompute so dashboard & filters reflect current eol_entries, not stale DB snapshot
+        # Re-derive each entry's status against today's date first, so a
+        # month-old sync still reports accurate countdowns, then roll the
+        # refreshed entries up into overall_status.
+        refresh_entries_status(d["eol_entries"])
         d["overall_status"] = _recompute_overall_status(d["eol_entries"])
         result.append(d)
     return result
@@ -768,15 +771,31 @@ def _persist_eol_product(product: str, cycles: list, ts: float):
 
 
 def _load_eol_from_db():
-    """Seed in-memory EOL cache from the persisted eol_cycles table on startup."""
+    """Seed in-memory EOL cache from the persisted eol_cycles table on startup.
+
+    Rows for products no longer referenced by OS_PATTERNS or CPE_MAP are
+    dropped rather than loaded.  Renaming a slug (e.g. "ie" → "internet-explorer")
+    otherwise leaves the old row behind forever: refresh_eol_cache never
+    revisits it, so it ages indefinitely while still being loaded into memory
+    on every start.
+    """
     try:
+        mapped = _all_eol_products()
         with get_conn() as con:
             rows = con.execute(
                 "SELECT product, cycles_json, fetched_at FROM eol_cycles"
             ).fetchall()
+            orphans = [r["product"] for r in rows if r["product"] not in mapped]
+            if orphans:
+                con.executemany("DELETE FROM eol_cycles WHERE product=?",
+                                [(p,) for p in orphans])
+                log.info(f"Pruned {len(orphans)} orphaned EOL cache row(s): "
+                         f"{', '.join(sorted(orphans))}")
         count = 0
         with EOL_LOCK:
             for row in rows:
+                if row["product"] not in mapped:
+                    continue
                 EOL_CACHE[row["product"]]    = json.loads(row["cycles_json"] or "[]")
                 EOL_CACHE_TS[row["product"]] = row["fetched_at"] or 0
                 count += 1
@@ -846,6 +865,42 @@ def compute_eol_status(eol_val) -> dict:
                 "eol_date": str(eol), "days_remaining": days}
     except Exception:
         return {"status": "unknown", "eol_date": str(eol_val), "days_remaining": None}
+
+
+# Matches a bare ISO calendar date, the only form we can safely re-evaluate.
+_ISO_DATE_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
+
+
+def refresh_entry_status(entry: dict) -> dict:
+    """Re-derive one entry's status/days_remaining from its stored eol_date.
+
+    status, days_remaining and eol_date are computed during sync via
+    date.today() and then frozen into the eol_entries JSON blob.  Without
+    re-deriving on read, the dashboard's clock stops at the last sync: an
+    asset recorded as "EOL Soon — 5 days" still reports 5 days a month later,
+    long after it actually went EOL.  Recomputing here keeps countdowns
+    honest between syncs, at the cost of one date parse per entry.
+
+    Only entries carrying a real ISO date (or the "No EOL" sentinel) are
+    touched.  Boolean-EOL and unknown entries have nothing to recompute
+    against and are left exactly as stored.
+    """
+    eol_date = entry.get("eol_date")
+    if isinstance(eol_date, str) and _ISO_DATE_RE.match(eol_date):
+        entry.update(compute_eol_status(eol_date))
+    elif eol_date == "No EOL":
+        entry.update(compute_eol_status(False))
+    elif eol_date is None and entry.get("status") == "eol":
+        # endoflife.date reported eol: true — permanently EOL, no date to test
+        entry.update(compute_eol_status(True))
+    return entry
+
+
+def refresh_entries_status(eol_entries: list) -> list:
+    """Apply refresh_entry_status to every entry in a stored eol_entries list."""
+    for e in eol_entries:
+        refresh_entry_status(e)
+    return eol_entries
 
 # ── OS / CPE parsing ──────────────────────────────────────────────────────────
 
@@ -1396,7 +1451,7 @@ def _job_update(job_id: str, **kw):
         _jobs[job_id].update(kw)
 
 
-def _run_sync_job(job_id: str, tenant_id: str, mode: str):
+def _run_sync_job(job_id: str, tenant_id: str, mode: str, force_eol: bool = False):
     cfg    = load_config()
     tenant = next((t for t in cfg["tenants"] if t["id"] == tenant_id), None)
     if not tenant:
@@ -1404,8 +1459,13 @@ def _run_sync_job(job_id: str, tenant_id: str, mode: str):
 
     try:
         # ── Step 0: refresh EOL reference data ───────────────────────────────
+        # force=False so EOL_CACHE_TTL applies: products fetched within the
+        # last 24 h are reused instead of re-downloading all ~96 endoflife.date
+        # feeds on every sync.  Lifecycle dates move on the order of months,
+        # and endoflife.date is a free community API — no reason to hammer it.
+        # Pass force_eol=True (POST /api/jobs {"force_eol": true}) to override.
         _job_update(job_id, status="warming", phase="Refreshing EOL reference data…")
-        refresh_eol_cache(force=True)
+        refresh_eol_cache(force=force_eol)
 
         # ── Step 1: export all assets from Tenable ───────────────────────────
         _job_update(job_id, status="fetching", phase="Starting asset export…")
@@ -1469,12 +1529,13 @@ def _run_sync_job(job_id: str, tenant_id: str, mode: str):
         _job_update(job_id, status="error", error=str(e))
 
 
-def start_job(tenant_id: str, mode: str) -> str:
+def start_job(tenant_id: str, mode: str, force_eol: bool = False) -> str:
     job_id = str(uuid.uuid4())[:12]
     with _jobs_lock:
         _jobs[job_id] = {"status": "starting", "progress": 0, "total": 0,
                          "tenant_id": tenant_id, "mode": mode, "phase": "Starting…"}
-    threading.Thread(target=_run_sync_job, args=(job_id, tenant_id, mode),
+    threading.Thread(target=_run_sync_job,
+                     args=(job_id, tenant_id, mode, force_eol),
                      daemon=True).start()
     return job_id
 
@@ -1582,12 +1643,19 @@ class Handler(BaseHTTPRequestHandler):
             out    = []
             for t in cfg["tenants"]:
                 tid = t["id"]
+                # Counted from eol_entries re-evaluated against today's date,
+                # not from the stored overall_status column.  The column holds
+                # the status as of the last sync, so aggregating it here would
+                # contradict the numbers /api/assets serves to the dashboard.
                 with get_conn() as con:
                     rows = con.execute(
-                        "SELECT overall_status, COUNT(*) as n FROM assets "
-                        "WHERE tenant_id=? GROUP BY overall_status", (tid,)
+                        "SELECT eol_entries FROM assets WHERE tenant_id=?", (tid,)
                     ).fetchall()
-                counts = {r["overall_status"]: r["n"] for r in rows}
+                counts: dict = {}
+                for r in rows:
+                    entries = refresh_entries_status(json.loads(r["eol_entries"] or "[]"))
+                    st      = _recompute_overall_status(entries)
+                    counts[st] = counts.get(st, 0) + 1
                 counts["total"] = sum(counts.values())
                 ss = db_get_sync_state(tid)
                 out.append({"id": tid, "name": t["name"], **counts,
@@ -2076,8 +2144,12 @@ class Handler(BaseHTTPRequestHandler):
             tenant_id = body.get("tenant_id", "")
             if not tenant_id:
                 self.send_json({"error": "tenant_id required"}, 400); return
-            job_id = start_job(tenant_id, "full")
-            self.send_json({"job_id": job_id, "mode": "full"}, 202); return
+            # force_eol=true bypasses EOL_CACHE_TTL and re-downloads every
+            # endoflife.date product — useful right before a demo.
+            force_eol = bool(body.get("force_eol", False))
+            job_id    = start_job(tenant_id, "full", force_eol=force_eol)
+            self.send_json({"job_id": job_id, "mode": "full",
+                            "force_eol": force_eol}, 202); return
 
         # Add tenant
         if path == "/api/tenants":
