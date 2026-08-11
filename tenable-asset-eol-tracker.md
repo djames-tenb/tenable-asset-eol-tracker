@@ -21,7 +21,8 @@ A self-hosted web dashboard that pulls all assets from a Tenable VM or Tenable O
 - Ranks EOL exposure by Tenable's **Asset Criticality Rating**, so "EOL" can be separated from "EOL *and* business critical"
 - Records one history point per sync and charts the **EOL trend**, showing whether exposure is shrinking rather than only how bad it is today
 - Caches all Tenable data and EOL cycle data in a local SQLite database so every page loads instantly with no live API calls
-- Supports multiple tenants in a single instance with credentials encrypted at rest using PBKDF2 + XOR with a per-install key file
+- Supports multiple tenants in a single instance; credentials are obfuscated at rest (PBKDF2-derived keystream XOR, per-install key file). The README is explicit that this protects against casual disclosure rather than a local attacker, since the key file sits alongside the ciphertext
+- Binds to loopback with no wildcard CORS, validates the HTTP `Host` header to block DNS rebinding, verifies TLS on every outbound call, and restricts tenant URLs to HTTPS on allowlisted Tenable hosts
 - Provides **three views**, all filterable by asset tag: an EOL dashboard, an Asset Inventory with an OS/application scope selector and per-asset drill-down, and a Software Inventory with a tracked-only filter
 - Explains its own gaps: the drill-down shows, per CPE, exactly why a lifecycle match was not found
 - Light and dark themes, following the OS setting with a manual override

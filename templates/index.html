@@ -16,7 +16,10 @@
 </script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* No webfont import, deliberately. Pulling Inter from a third-party font CDN
+   sent every viewer's IP and User-Agent off-box and left the page unstyled on
+   an air-gapped or egress-filtered host. The stack below resolves to the
+   platform UI font, which is Inter-like on every modern OS. */
 
 /* ── Reset & base ─────────────────────────────────────── */
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -95,7 +98,7 @@
   --shadow-md:0 4px 16px rgba(0,0,0,.1),0 2px 6px rgba(0,0,0,.06);
   --shadow-lg:0 12px 40px rgba(0,0,0,.15),0 4px 12px rgba(0,0,0,.08);
 
-  --font:'Inter',system-ui,-apple-system,sans-serif;
+  --font:system-ui,-apple-system,'Segoe UI',Roboto,'Helvetica Neue',Arial,sans-serif;
   --nav-w:228px;
   --header-h:58px;
   --radius:10px;

@@ -125,6 +125,82 @@ EOL_LOCK             = threading.Lock()
 EOL_API              = "https://endoflife.date/api"
 EOL_CACHE_TTL        = 24 * 3600  # re-fetch any product older than 24 h
 
+# ── Tenant URL allowlist (SSRF guard) ────────────────────────────────────────
+# Tenant URLs are attacker-controllable input that the server then fetches, so
+# an unvalidated value turns /api/tenants/<id>/test into a server-side request
+# forge: http://169.254.169.254/server/status would happily return cloud
+# instance metadata.  Restrict to Tenable hosts over HTTPS by default.
+# Override for a private deployment with:
+#   EOL_ALLOWED_HOSTS="tenable.example.internal,.tenable.com"
+# A leading dot means "this domain and any subdomain".
+_hosts_env = os.environ.get("EOL_ALLOWED_HOSTS", "cloud.tenable.com,.tenable.com")
+ALLOWED_TENANT_HOSTS = tuple(
+    h.strip().lower() for h in _hosts_env.split(",") if h.strip()
+)
+
+# Host header values this server will answer to.  Binding to loopback is not a
+# boundary against a browser: an attacker's page whose DNS re-resolves to
+# 127.0.0.1 (DNS rebinding) reaches the server as same-origin, which also
+# defeats the absence of CORS headers.  Checking Host is the actual defence.
+# Add LAN names with EOL_HOST_ALLOWLIST="eol.lab.local,10.0.0.5".
+ALLOWED_HTTP_HOSTS = {"localhost", "127.0.0.1", "::1"}
+ALLOWED_HTTP_HOSTS.update(
+    h.strip().lower() for h in os.environ.get("EOL_HOST_ALLOWLIST", "").split(",")
+    if h.strip()
+)
+if BIND_HOST not in ("0.0.0.0", "::", ""):
+    ALLOWED_HTTP_HOSTS.add(BIND_HOST.lower())
+
+
+def validate_tenant_url(raw: str) -> str:
+    """Return a normalised tenant base URL, or raise ValueError.
+
+    Requires HTTPS and a hostname on ALLOWED_TENANT_HOSTS.  Bare IP addresses
+    are always refused: they are the shape SSRF payloads take (link-local
+    metadata endpoints, loopback, RFC1918), and a real Tenable deployment is
+    reached by name.
+    """
+    if not raw or not str(raw).strip():
+        raise ValueError("Tenant URL is required")
+    parsed = urlparse(str(raw).strip())
+    if parsed.scheme != "https":
+        raise ValueError(
+            f"Tenant URL must use https (got {parsed.scheme or 'no scheme'!r}). "
+            "API keys are sent on every request."
+        )
+    host = (parsed.hostname or "").lower()
+    if not host:
+        raise ValueError("Tenant URL has no hostname")
+    try:
+        import ipaddress
+        ipaddress.ip_address(host)
+        raise ValueError(
+            f"Tenant URL must name a host, not an IP address ({host}). "
+            "Set EOL_ALLOWED_HOSTS if you need a private deployment."
+        )
+    except ValueError as e:
+        if "must name a host" in str(e):
+            raise
+    ok = any(
+        host == a or (a.startswith(".") and host.endswith(a))
+        for a in ALLOWED_TENANT_HOSTS
+    )
+    if not ok:
+        raise ValueError(
+            f"Host {host!r} is not allowed. Permitted: "
+            f"{', '.join(ALLOWED_TENANT_HOSTS)}. Override with EOL_ALLOWED_HOSTS."
+        )
+    return f"https://{parsed.netloc}{parsed.path}".rstrip("/")
+
+
+def tenant_base_url(tenant: dict) -> str:
+    """Validated base URL for a stored tenant.
+
+    Applied on every outbound call, not just on save, so a config.json written
+    before this check existed cannot bypass it.
+    """
+    return validate_tenant_url(tenant.get("url", ""))
+
 # ── OS → endoflife.date mapping ──────────────────────────────────────────────
 OS_PATTERNS = [
     # ── Windows Server (all versions share one endoflife.date slug) ───────────
@@ -1345,7 +1421,7 @@ def _start_export(tenant: dict, since_ts: float | None = None) -> str:
                           NESSUS_AGENT = agent-based scans)
       - last_seen within the past 90 days (full sync) or since_ts (delta)
     """
-    base = tenant["url"].rstrip("/")
+    base = tenant_base_url(tenant)
 
     # Valid export API filter fields (Tenable docs): has_plugin_results,
     # created_at, updated_at, first_seen, last_scan_time, terminated_at.
@@ -1375,7 +1451,7 @@ def _start_export(tenant: dict, since_ts: float | None = None) -> str:
 def _wait_for_export(tenant: dict, export_id: str,
                      job_id: str | None = None) -> list[int]:
     """Poll GET /assets/export/{uuid}/status until FINISHED. Returns chunk list."""
-    base = tenant["url"].rstrip("/")
+    base = tenant_base_url(tenant)
     hdrs = tenable_headers(tenant)
     for attempt in range(EXPORT_POLL_MAX):
         time.sleep(EXPORT_POLL_INTERVAL)
@@ -1395,7 +1471,7 @@ def _wait_for_export(tenant: dict, export_id: str,
 
 def _download_chunk(tenant: dict, export_id: str, chunk_id: int) -> list:
     """Download one export chunk and return the list of asset dicts."""
-    base = tenant["url"].rstrip("/")
+    base = tenant_base_url(tenant)
     return http_get(
         f"{base}/assets/export/{export_id}/chunks/{chunk_id}",
         headers=tenable_headers(tenant), timeout=60
@@ -1512,8 +1588,11 @@ def build_asset(raw: dict, tenant_id: str) -> dict:
     if not _tag_debug_logged:
         top_keys  = list(raw.keys())
         tags_raw_ = raw.get("tags")
-        log.info(f"[tag-debug] First export asset keys: {top_keys}")
-        log.info(f"[tag-debug] First export asset 'tags' field type={type(tags_raw_).__name__!r} value={tags_raw_!r}")
+        # Field names only, at debug level: the values are customer asset data
+        # and tag contents, which do not belong in a log by default.
+        log.debug("First export asset keys: %s", top_keys)
+        log.debug("First export asset 'tags' field type=%s count=%d",
+                  type(tags_raw_).__name__, len(tags_raw_ or []))
         _tag_debug_logged = True
 
     asset_id     = raw.get("id", "")
@@ -1746,6 +1825,12 @@ def _run_sync_job(job_id: str, tenant_id: str, mode: str, force_eol: bool = Fals
 def start_job(tenant_id: str, mode: str, force_eol: bool = False) -> str:
     job_id = str(uuid.uuid4())[:12]
     with _jobs_lock:
+        # Bound the registry: it is only read by the UI polling a live job, so
+        # finished entries accumulate for the process lifetime otherwise.
+        if len(_jobs) >= 50:
+            for stale in [k for k, v in list(_jobs.items())
+                          if v.get("status") in ("done", "error")][:25]:
+                _jobs.pop(stale, None)
         _jobs[job_id] = {"status": "starting", "progress": 0, "total": 0,
                          "tenant_id": tenant_id, "mode": mode, "phase": "Starting…"}
     threading.Thread(target=_run_sync_job,
@@ -1781,6 +1866,32 @@ class Handler(BaseHTTPRequestHandler):
         n = int(self.headers.get("Content-Length", 0))
         return json.loads(self.rfile.read(n)) if n else {}
 
+    def host_allowed(self) -> bool:
+        """Reject requests whose Host header is not one we expect.
+
+        Defends against DNS rebinding: binding to 127.0.0.1 does not stop a
+        browser, because an attacker's page whose domain re-resolves to
+        127.0.0.1 reaches this server as same-origin — so the absence of CORS
+        headers does not help either.  Comparing Host does.
+        """
+        raw  = (self.headers.get("Host") or "").strip().lower()
+        host = raw.rsplit(":", 1)[0] if raw.count(":") == 1 else raw
+        host = host.strip("[]")     # IPv6 literal form [::1]:5555
+        if not host:
+            return False
+        return host in ALLOWED_HTTP_HOSTS
+
+    def guard(self) -> bool:
+        """Call at the top of every verb handler. Returns False if refused."""
+        if self.host_allowed():
+            return True
+        log.warning("Refused request with unexpected Host header %r from %s",
+                    self.headers.get("Host"), self.address_string())
+        self.send_json({"error": "Host not allowed. If you are reaching this "
+                                 "server by another name, add it to "
+                                 "EOL_HOST_ALLOWLIST."}, 403)
+        return False
+
     def do_OPTIONS(self):
         # Same-origin only; advertise the methods without granting cross-origin
         # access.
@@ -1790,6 +1901,7 @@ class Handler(BaseHTTPRequestHandler):
 
     # ── GET ───────────────────────────────────────────────────────────────────
     def do_GET(self):
+        if not self.guard(): return
         parsed = urlparse(self.path)
         path   = parsed.path
         qs     = parse_qs(parsed.query)
@@ -1813,7 +1925,11 @@ class Handler(BaseHTTPRequestHandler):
             if not t:
                 self.send_json({"ok": False, "error": "Not found"}, 404); return
             try:
-                data = http_get(f"{t['url'].rstrip('/')}/server/status",
+                base = tenant_base_url(t)   # refuses non-Tenable / non-https hosts
+            except ValueError as e:
+                self.send_json({"ok": False, "error": str(e)}, 400); return
+            try:
+                data = http_get(f"{base}/server/status",
                                 headers=tenable_headers(t), timeout=10)
                 self.send_json({"ok": True, "status": data})
             except Exception as e:
@@ -2331,7 +2447,7 @@ class Handler(BaseHTTPRequestHandler):
             tenant = next((t for t in cfg["tenants"] if t["id"] == tenant_id), None)
             if not tenant:
                 self.send_json({"error": "tenant not found"}, 404); return
-            base   = tenant["url"].rstrip("/")
+            base   = tenant_base_url(tenant)
             hdrs   = tenable_headers(tenant)
             result = {"tenant_id": tenant_id}
             # 1. List all tag values (GET /tags/values)
@@ -2362,6 +2478,7 @@ class Handler(BaseHTTPRequestHandler):
 
     # ── POST ──────────────────────────────────────────────────────────────────
     def do_POST(self):
+        if not self.guard(): return
         path = urlparse(self.path).path
 
         # Start sync job
@@ -2385,9 +2502,13 @@ class Handler(BaseHTTPRequestHandler):
             body = self.read_body()
             if not all(body.get(k) for k in ["name", "url", "access_key", "secret_key"]):
                 self.send_json({"error": "Required: name, url, access_key, secret_key"}, 400); return
+            try:
+                safe_url = validate_tenant_url(body["url"])
+            except ValueError as e:
+                self.send_json({"error": str(e)}, 400); return
             cfg    = load_config()
             tenant = {"id": str(uuid.uuid4())[:8], "name": body["name"].strip(),
-                      "url": body["url"].rstrip("/"),
+                      "url": safe_url,
                       "access_key": body["access_key"].strip(),
                       "secret_key": body["secret_key"].strip()}
             cfg["tenants"].append(tenant)
@@ -2398,16 +2519,22 @@ class Handler(BaseHTTPRequestHandler):
 
     # ── PUT ───────────────────────────────────────────────────────────────────
     def do_PUT(self):
+        if not self.guard(): return
         m = re.match(r"^/api/tenants/([^/]+)$", urlparse(self.path).path)
         if m:
             tid  = m.group(1)
             body = self.read_body()
+            if body.get("url"):
+                try:
+                    body["url"] = validate_tenant_url(body["url"])
+                except ValueError as e:
+                    self.send_json({"error": str(e)}, 400); return
             cfg  = load_config()
             for t in cfg["tenants"]:
                 if t["id"] == tid:
                     for k in ["name", "url", "access_key", "secret_key"]:
                         if body.get(k):
-                            t[k] = body[k].strip().rstrip("/") if k=="url" else body[k].strip()
+                            t[k] = body[k] if k == "url" else body[k].strip()
                     save_config(cfg)
                     self.send_json({"ok": True}); return
             self.send_json({"error": "Not found"}, 404); return
@@ -2415,6 +2542,7 @@ class Handler(BaseHTTPRequestHandler):
 
     # ── DELETE ────────────────────────────────────────────────────────────────
     def do_DELETE(self):
+        if not self.guard(): return
         m = re.match(r"^/api/tenants/([^/]+)$", urlparse(self.path).path)
         if m:
             tid = m.group(1)

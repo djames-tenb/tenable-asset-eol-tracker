@@ -48,7 +48,29 @@ Server-side aggregated view of all detected software CPE strings. Groups by prod
 
 - Python 3.8 or later (no additional packages)
 - Tenable VM or Tenable One API credentials (access key + secret key)
-- Network access to `cloud.tenable.com` and `endoflife.date`
+
+### Outbound network calls
+
+Every destination this tool contacts, and why:
+
+| Destination | Made by | Purpose |
+|---|---|---|
+| `cloud.tenable.com` (or your tenant URL) | Server | Asset export, tags, `/server/status` connectivity test. Carries your API keys |
+| `endoflife.date` | Server | Product lifecycle data, cached 24 h |
+| `cdnjs.cloudflare.com` | **Browser** | Loads `Chart.js 4.4.1` for the dashboard charts |
+
+No other host is contacted, and no asset data ever leaves your machine — the
+Tenable and endoflife.date calls are outbound requests for data, and
+endoflife.date receives only a product slug in the URL path.
+
+**Known limitation:** the Chart.js dependency is loaded from a CDN, so on an
+air-gapped or egress-filtered host the charts will not render. Everything else
+— tables, filters, drill-down, CSV export — works offline. To run fully
+offline, download `chart.umd.min.js` into the repo and change the `<script
+src>` in `templates/index.html` to a relative path.
+
+Tenant URLs are restricted to `https://` on `cloud.tenable.com` or any
+`*.tenable.com` host. Set `EOL_ALLOWED_HOSTS` to permit a private deployment.
 
 ---
 
@@ -77,9 +99,13 @@ Then click **Sync** to fetch all assets. Sync time depends on asset count; 30 00
 
 ## Configuration
 
-All tenant configuration is stored in `config.json`. API credentials are encrypted at rest using a per-install key file (`.eol_portal_secret`, created automatically on first run, chmod 600).
+All tenant configuration is stored in `config.json`. API credentials are obfuscated at rest: PBKDF2-derived keystream XORed with the plaintext, using a per-install key file (`.eol_portal_secret`, created on first run, chmod 600). Ciphertext carries an `enc:v1:` prefix. Plaintext keys you paste in are converted on the next save.
+
+**Be clear about what this does and does not protect.** The key file sits beside `config.json` with the same owner and permissions, so anything able to read the ciphertext can also read the key. This defends against casual disclosure — a screenshot, a stray copy, an unencrypted backup — and **not** against a local attacker or malware running as your user. If you need real protection, keep the keys in the macOS Keychain or another OS secret store and load them into the environment, rather than relying on this.
 
 **Never commit `config.json` or `.eol_portal_secret` to source control.** Both are in `.gitignore`.
+
+Use a dedicated Tenable API key with the least privilege that works (asset export and tag read), and rotate it if the file is ever exposed.
 
 ### Environment variables
 
@@ -89,6 +115,8 @@ All tenant configuration is stored in `config.json`. API credentials are encrypt
 | `EOL_BIND` | `127.0.0.1` | Bind address. The app has **no authentication** and holds Tenable API keys, so it listens on loopback only. Set `0.0.0.0` to expose it deliberately and restrict access at the network layer |
 | `EOL_SOURCES` | `NESSUS_SCAN,NESSUS_AGENT` | Asset sources to analyse. ASM/EASM-discovered assets carry no OS or installed-software data, so they can never match a lifecycle entry and only inflate the Unknown count. Set `*` to keep every source |
 | `EOL_INSECURE_TLS` | unset | Set to `1` to skip TLS certificate verification. Only for a Tenable instance behind a self-signed certificate — it exposes your API keys to interception |
+| `EOL_ALLOWED_HOSTS` | `cloud.tenable.com,.tenable.com` | Hostnames a tenant URL may point at. A leading dot matches subdomains. Prevents the server being pointed at, say, a cloud metadata endpoint |
+| `EOL_HOST_ALLOWLIST` | empty | Extra values accepted in the HTTP `Host` header. Requests arriving under any other name are refused, which blocks DNS rebinding. Add your LAN name here if you set `EOL_BIND=0.0.0.0` |
 
 ```bash
 PORT=8080 EOL_BIND=0.0.0.0 python3 app.py
